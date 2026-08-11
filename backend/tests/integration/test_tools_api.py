@@ -1,4 +1,4 @@
-"""The merge and split endpoints, end to end.
+"""The merge, organise and split endpoints, end to end.
 
 These run against a real database and real files on disk, so they cover the
 parts unit tests cannot: that a job row is written, that the result becomes a
@@ -16,6 +16,7 @@ from httpx import Response
 
 MERGE = "/api/v1/tools/merge"
 SPLIT = "/api/v1/tools/split"
+ORGANISE = "/api/v1/tools/organise"
 JOBS = "/api/v1/jobs"
 UPLOAD = "/api/v1/documents/upload"
 
@@ -317,6 +318,154 @@ def test_split_cannot_reach_another_users_document(authed_client: TestClient) ->
     )
 
     assert response.status_code == 404
+
+
+# --- Organise ----------------------------------------------------------
+
+
+def rotations_in(data: bytes) -> list[int]:
+    with pymupdf.open(stream=data, filetype="pdf") as document:
+        return [page.rotation for page in document]
+
+
+def organise(
+    client: TestClient, document_id: str, pages: list[dict[str, int]], **extra: str
+) -> Response:
+    body: dict[str, object] = {"document_id": document_id, "pages": pages, **extra}
+    response: Response = client.post(ORGANISE, json=body)
+    return response
+
+
+def test_organise_keeps_only_the_pages_it_is_sent(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 5)
+
+    response = organise(authed_client, document_id, [{"number": 1}, {"number": 3}, {"number": 5}])
+
+    assert response.status_code == 200, response.text
+    output = response.json()["data"]["output"]
+    assert output["page_count"] == 3
+    assert labels_in(download(authed_client, output["id"])) == ["P1", "P3", "P5"]
+
+
+def test_organise_applies_order_and_rotation_together(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 4)
+
+    response = organise(
+        authed_client,
+        document_id,
+        [{"number": 4, "rotation": 90}, {"number": 1}, {"number": 2, "rotation": 180}],
+    )
+
+    data = download(authed_client, response.json()["data"]["output"]["id"])
+    assert labels_in(data) == ["P4", "P1", "P2"]
+    assert rotations_in(data) == [90, 0, 180]
+
+
+def test_organise_records_the_plan_on_the_job(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 3)
+
+    job = organise(authed_client, document_id, [{"number": 2, "rotation": 90}]).json()["data"][
+        "job"
+    ]
+
+    assert job["operation"] == "ORGANISE"
+    assert job["status"] == "COMPLETED"
+    assert job["document_id"] == document_id
+    assert job["options"]["pages"] == [{"number": 2, "rotation": 90}]
+    # Recorded so history can say "3 pages became 1" without reopening the file.
+    assert job["options"]["source_page_count"] == 3
+
+
+def test_organise_can_be_given_a_name(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 2)
+
+    response = organise(authed_client, document_id, [{"number": 1}], output_name="tidied.pdf")
+
+    assert response.json()["data"]["output"]["original_filename"] == "tidied.pdf"
+
+
+def test_organise_names_the_result_after_the_source_by_default(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 2)
+
+    response = organise(authed_client, document_id, [{"number": 1}])
+
+    assert response.json()["data"]["output"]["original_filename"] == "report-organised.pdf"
+
+
+def test_organise_refuses_a_page_the_document_does_not_have(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 3)
+
+    response = organise(authed_client, document_id, [{"number": 9}])
+
+    assert response.status_code == 422
+    assert "no page 9" in error_of(response)
+
+
+def test_organise_refuses_an_empty_plan(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 3)
+
+    response = organise(authed_client, document_id, [])
+
+    # Caught by the schema: a document with no pages is not a document.
+    assert response.status_code == 422
+
+
+def test_organise_refuses_a_rotation_that_is_not_a_quarter_turn(
+    authed_client: TestClient,
+) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 2)
+
+    response = organise(authed_client, document_id, [{"number": 1, "rotation": 45}])
+
+    assert response.status_code == 422
+
+
+def test_organise_records_nothing_when_the_plan_is_rejected(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 3)
+
+    organise(authed_client, document_id, [{"number": 9}])
+
+    # The plan is checked before a job starts, so a request that never began
+    # processing leaves no failed job behind.
+    assert authed_client.get(JOBS).json()["data"]["total"] == 0
+
+
+def test_organise_cannot_reach_another_users_document(authed_client: TestClient) -> None:
+    theirs = _upload_as_other_user(authed_client)
+
+    response = organise(authed_client, theirs, [{"number": 1}])
+
+    assert response.status_code == 404
+
+
+def test_organise_refuses_an_image(authed_client: TestClient) -> None:
+    png = upload_png(authed_client)
+
+    response = organise(authed_client, png, [{"number": 1}])
+
+    assert response.status_code == 422
+    assert "not a PDF" in error_of(response)
+
+
+def test_organise_needs_a_signed_in_user(api_client: TestClient) -> None:
+    response = api_client.post(
+        ORGANISE, json={"document_id": str(uuid.uuid4()), "pages": [{"number": 1}]}
+    )
+
+    assert response.status_code == 401
+
+
+def test_an_organised_result_can_be_organised_again(authed_client: TestClient) -> None:
+    # The output is an ordinary document, so it is a valid input to any tool.
+    document_id = upload_pdf(authed_client, "report.pdf", 4)
+    first = organise(authed_client, document_id, [{"number": 3}, {"number": 1}]).json()["data"][
+        "output"
+    ]["id"]
+
+    response = organise(authed_client, first, [{"number": 2}])
+
+    assert response.status_code == 200
+    assert labels_in(download(authed_client, response.json()["data"]["output"]["id"])) == ["P1"]
 
 
 # --- Jobs --------------------------------------------------------------

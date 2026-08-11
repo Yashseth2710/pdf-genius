@@ -2,7 +2,9 @@
 
 from app.services.pdf.operations import (
     OutputFile,
+    PlannedPage,
     SourcePdf,
+    apply_page_plan,
     extract_pages,
     merge,
     split_by_ranges,
@@ -15,7 +17,9 @@ __all__ = [
     "OutputFile",
     "PageRange",
     "PageRangeError",
+    "PlannedPage",
     "SourcePdf",
+    "apply_page_plan",
     "extract_pages",
     "merge",
     "parse_page_numbers",

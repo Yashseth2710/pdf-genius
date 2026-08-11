@@ -14,7 +14,7 @@ import pytest
 
 from app.core.errors import InvalidFileError, ProcessingError
 from app.services.pdf import operations
-from app.services.pdf.operations import SourcePdf
+from app.services.pdf.operations import PlannedPage, SourcePdf
 from app.services.pdf.ranges import PageRange
 
 
@@ -195,6 +195,105 @@ def test_extract_names_the_output_after_the_source() -> None:
     result = operations.extract_pages(source("report.pdf", numbered("P", 5)), [1])
 
     assert result.filename == "report-selected-pages.pdf"
+
+
+# --- Page plans --------------------------------------------------------
+
+
+def rotations_in(data: bytes) -> list[int]:
+    """How each page of the produced document sits, in order."""
+    with pymupdf.open(stream=data, filetype="pdf") as document:
+        return [page.rotation for page in document]
+
+
+def plan(*pages: int | tuple[int, int]) -> list[PlannedPage]:
+    """Shorthand: plan(3, (1, 90)) keeps page 3, then page 1 turned right."""
+    return [
+        PlannedPage(number=page[0], rotation=page[1])
+        if isinstance(page, tuple)
+        else PlannedPage(number=page)
+        for page in pages
+    ]
+
+
+def test_a_plan_keeps_only_the_pages_it_names() -> None:
+    # Deleting a page is that page being absent from the plan.
+    result = operations.apply_page_plan(source("report.pdf", numbered("P", 5)), plan(1, 2, 4, 5))
+
+    assert labels_in(result.data) == ["P1", "P2", "P4", "P5"]
+    assert result.page_count == 4
+
+
+def test_a_plan_reorders_pages_into_the_order_given() -> None:
+    result = operations.apply_page_plan(source("report.pdf", numbered("P", 3)), plan(3, 1, 2))
+
+    assert labels_in(result.data) == ["P3", "P1", "P2"]
+
+
+def test_a_plan_rotates_the_pages_it_marks() -> None:
+    result = operations.apply_page_plan(
+        source("report.pdf", numbered("P", 3)), plan(1, (2, 90), (3, 180))
+    )
+
+    assert rotations_in(result.data) == [0, 90, 180]
+
+
+def test_rotation_adds_to_how_a_page_already_sits() -> None:
+    # A scan that arrives at 90 and is turned once more belongs at 180.
+    with pymupdf.open() as document:
+        page = document.new_page()
+        page.insert_text((72, 72), "P1", fontsize=24)
+        page.set_rotation(90)
+        sideways = bytes(document.tobytes())
+
+    result = operations.apply_page_plan(source("scan.pdf", sideways), plan((1, 90)))
+
+    assert rotations_in(result.data) == [180]
+
+
+def test_rotation_wraps_rather_than_running_past_a_full_turn() -> None:
+    with pymupdf.open() as document:
+        page = document.new_page()
+        page.insert_text((72, 72), "P1", fontsize=24)
+        page.set_rotation(270)
+        sideways = bytes(document.tobytes())
+
+    result = operations.apply_page_plan(source("scan.pdf", sideways), plan((1, 180)))
+
+    assert rotations_in(result.data) == [90]
+
+
+def test_rotating_moves_the_page_without_losing_its_content() -> None:
+    result = operations.apply_page_plan(source("report.pdf", numbered("P", 2)), plan((1, 90), 2))
+
+    assert labels_in(result.data) == ["P1", "P2"]
+
+
+def test_a_plan_can_do_all_three_things_at_once() -> None:
+    # The reason this is one operation rather than three: the user turned a
+    # page, moved it and dropped another, and expects one new document.
+    result = operations.apply_page_plan(source("report.pdf", numbered("P", 4)), plan((4, 90), 1, 2))
+
+    assert labels_in(result.data) == ["P4", "P1", "P2"]
+    assert rotations_in(result.data) == [90, 0, 0]
+
+
+def test_a_plan_may_repeat_a_page() -> None:
+    # Duplicating a page - a cover sheet at both ends - is a real request.
+    result = operations.apply_page_plan(source("report.pdf", numbered("P", 3)), plan(1, 2, 1))
+
+    assert labels_in(result.data) == ["P1", "P2", "P1"]
+
+
+def test_an_empty_plan_is_refused() -> None:
+    with pytest.raises(ProcessingError, match="at least one page"):
+        operations.apply_page_plan(source("report.pdf", numbered("P", 3)), [])
+
+
+def test_a_plan_names_its_output_after_the_source() -> None:
+    result = operations.apply_page_plan(source("report.pdf", numbered("P", 2)), plan(1))
+
+    assert result.filename == "report-organised.pdf"
 
 
 # --- Archives ----------------------------------------------------------

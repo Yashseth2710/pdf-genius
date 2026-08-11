@@ -20,8 +20,8 @@ A scope is finished only when all of this is true (spec section 64):
 | 3  | Authentication            | L    | 2          | ✅ Done |
 | 4  | File infrastructure       | L    | 3          | ✅ Done |
 | 5  | Merge and split           | M    | 4          | ✅ Done |
-| 6  | Page organisation         | L    | 5          | Next   |
-| 7  | Compression and conversion| M    | 4          |        |
+| 6  | Page organisation         | L    | 5          | ✅ Done |
+| 7  | Compression and conversion| M    | 4          | Next   |
 | 8  | Watermark                 | S    | 4          |        |
 | 9  | Dashboard and history     | M    | 5–8        |        |
 | 10 | AI features               | L    | 4          |        |
@@ -138,17 +138,42 @@ arbitrary. Now `clock_timestamp()`.
 
 ---
 
-## 6. Page organisation
+## 6. Page organisation ✅
 
-Rotate, delete, reorder and extract pages — one interaction model, four tools.
+Rotate, delete, reorder and extract pages — one interaction model, as the scope
+asked, and in the end one screen rather than four.
 
-- Thumbnail grid rendered with PDF.js, drag-and-drop reordering via dnd-kit,
-  multi-select with keyboard support
-- Rotate 90/180/270 on selected or all pages
-- Delete and extract by selection; reorder writes a new document in the chosen order
+**Shipped — backend:** a single `POST /tools/organise` taking a *page plan*:
+the pages to keep, in order, each with a rotation. Rotating, reordering and
+deleting are the same edit to a document, so four endpoints would have meant
+four passes and four history entries for one thing the user did once. Rotation
+is added to how a page already sits, so a sideways scan turns from where it is
+rather than from zero. New `ORGANISE` operation type, with a migration.
 
-**Watch out for:** thumbnail rendering for large documents — render lazily and
-off the main thread, or a 200-page file will freeze the tab.
+**Shipped — frontend:** a thumbnail grid drawn by PDF.js, dragging via dnd-kit,
+and move/turn/remove buttons on every card so none of it needs a mouse.
+Removed pages stay visible and greyed rather than vanishing, so they can be put
+back and the pages around them do not renumber under the cursor. Turning is CSS
+on the canvas, so it is instant — the document is only rewritten on save.
+
+**Also shipped: preview.** Clicking a document opens it page by page, using the
+same renderer — it was deferred from scope 4 precisely so it could share this
+code rather than be built twice. Clicking a page opens it **full screen**,
+drawn at the width of the window rather than at thumbnail size, with next and
+previous, arrow keys and Escape. Thumbnails are for finding a page; that is for
+reading it.
+
+**Shipped — tests:** 23 for the plan module (pure state, no canvas), 14 for the
+organiser, 11 end to end including one that asserts a real `<canvas>` per page
+and one that measures the full-screen canvas is wider than a thumbnail — a
+worker that fails to resolve leaves skeletons behind and would pass any test
+that only checked the grid rendered.
+
+**The large-document trap was real.** Every thumbnail waits for an
+IntersectionObserver before drawing, with a screen of margin, so a 200-page
+document draws the dozen pages you can see rather than all 200. Rendering runs
+on the PDF.js worker thread; without `workerSrc` set it silently falls back to
+the main thread and freezes the tab.
 
 ---
 

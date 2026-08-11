@@ -1,4 +1,4 @@
-import { Combine, Scissors } from 'lucide-react'
+import { Combine, LayoutGrid, Scissors } from 'lucide-react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
@@ -25,6 +25,12 @@ const TOOLS = [
     icon: Scissors,
     title: 'Split a PDF',
     description: 'Pull pages out by range, one at a time, or as a selection.',
+  },
+  {
+    href: '/dashboard/tools/organise',
+    icon: LayoutGrid,
+    title: 'Organise pages',
+    description: 'See every page, then turn, reorder or remove the ones you want.',
   },
 ]
 
