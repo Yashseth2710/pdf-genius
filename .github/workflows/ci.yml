@@ -21,6 +21,24 @@ jobs:
     defaults:
       run:
         working-directory: backend
+
+    # A throwaway PostgreSQL for the integration tests. This is what Docker
+    # would have provided locally; in CI the runner supplies it.
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: pdf_genius_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v5
 
@@ -43,9 +61,11 @@ jobs:
         run: mypy app tests
 
       - name: Tests
-        # The suite is self-contained: tests/conftest.py supplies dummy
-        # settings, so no database is needed at this stage.
+        # Unit tests need no database; the integration tests run migrations
+        # against the service container above and roll them back afterwards.
         run: pytest
+        env:
+          TEST_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/pdf_genius_test
 
   frontend:
     name: Frontend (lint, types, tests, build)

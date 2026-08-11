@@ -16,8 +16,8 @@ A scope is finished only when all of this is true (spec section 64):
 | #  | Scope                     | Size | Depends on | Status |
 | -- | ------------------------- | ---- | ---------- | ------ |
 | 1  | Foundation                | M    | —          | ✅ Done |
-| 2  | Data model and migrations | S    | 1          | Next   |
-| 3  | Authentication            | L    | 2          |        |
+| 2  | Data model and migrations | S    | 1          | ✅ Done |
+| 3  | Authentication            | L    | 2          | Next   |
 | 4  | File infrastructure       | L    | 3          |        |
 | 5  | Merge and split           | M    | 4          |        |
 | 6  | Page organisation         | L    | 5          |        |
@@ -40,22 +40,22 @@ green CI jobs.
 
 ---
 
-## 2. Data model and migrations
+## 2. Data model and migrations ✅
 
-The whole schema from spec section 14, in one migration, so later scopes add
+The whole schema from spec section 14 in one migration, so later scopes add
 behaviour rather than reshaping tables.
 
-- SQLAlchemy models: `users`, `documents`, `processing_jobs`, `ai_sessions`,
-  `ai_messages`
-- Enums for job status (`QUEUED`/`PROCESSING`/`COMPLETED`/`FAILED`) and
-  operation type
-- Foreign keys with cascade rules, plus indexes on `users.email`,
-  `documents.user_id` and `processing_jobs.user_id`
-- Alembic configured against `DATABASE_URL`, first revision applied to Neon
-- Repository base class for database access
+**Shipped:** five tables with UUID primary keys, five native enum types,
+cascade deletes enforced by the database, `jsonb` for job options, indexes on
+every `user_id`; Alembic reading `DATABASE_URL` so no password lives in
+`alembic.ini`; a repository base class whose `get_for_user` returns `None`
+rather than someone else's record; 12 metadata tests and 8 integration tests
+against real PostgreSQL.
 
-**Done when:** `alembic upgrade head` builds the schema on an empty database and
-`alembic downgrade base` tears it down cleanly.
+Applied to Neon and round-tripped: `upgrade head` → `downgrade base` →
+`upgrade head`, with `alembic check` reporting no drift.
+
+See [DATABASE.md](DATABASE.md).
 
 ---
 

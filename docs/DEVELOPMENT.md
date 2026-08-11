@@ -110,6 +110,13 @@ App: <http://localhost:3000>
 | `ruff check . --fix`       | Lint and auto-fix                     |
 | `ruff format .`            | Format                                |
 | `mypy app tests`           | Type check (strict)                   |
+| `alembic upgrade head`     | Apply migrations                      |
+| `alembic revision --autogenerate -m "..."` | Generate a migration from model changes |
+| `alembic check`            | Detect drift between models and database |
+
+Integration tests need a real database and are skipped without one. Point
+`TEST_DATABASE_URL` at a **disposable** database — the tests build the schema and
+drop it again. See [DATABASE.md](DATABASE.md).
 
 **Frontend** (from `frontend/`)
 

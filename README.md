@@ -155,7 +155,7 @@ Built in 12 vertical slices — see [docs/ROADMAP.md](docs/ROADMAP.md) for what
 each one delivers and when it counts as finished.
 
 - [x] **1** — Foundation: structure, configuration, database, error handling, health checks, CI
-- [ ] **2** — Data model and migrations
+- [x] **2** — Data model and migrations
 - [ ] **3** — Authentication
 - [ ] **4** — File infrastructure: upload, validation, storage, download, delete
 - [ ] **5** — Merge and split
