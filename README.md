@@ -151,17 +151,21 @@ All endpoints live under `/api/v1` and return a consistent envelope:
 
 ## Roadmap
 
-- [x] **Phase 1** — Project foundation: structure, configuration, database, error handling, health checks, CI
-- [ ] **Phase 2** — Authentication: register, log in, JWT, protected routes
-- [ ] **Phase 3** — File infrastructure: upload, validation, storage, download, delete
-- [ ] **Phase 4** — Merge and split
-- [ ] **Phase 5** — Rotate, delete, reorder and extract pages
-- [ ] **Phase 6** — Compression and image conversion
-- [ ] **Phase 7** — Text watermark
-- [ ] **Phase 8** — Dashboard and history
-- [ ] **Phase 9** — AI: text extraction, summaries, ask-your-PDF
-- [ ] **Phase 10** — Testing, accessibility and security hardening
-- [ ] **Phase 11** — Deployment
+Built in 12 vertical slices — see [docs/ROADMAP.md](docs/ROADMAP.md) for what
+each one delivers and when it counts as finished.
+
+- [x] **1** — Foundation: structure, configuration, database, error handling, health checks, CI
+- [ ] **2** — Data model and migrations
+- [ ] **3** — Authentication
+- [ ] **4** — File infrastructure: upload, validation, storage, download, delete
+- [ ] **5** — Merge and split
+- [ ] **6** — Page organisation: rotate, delete, reorder, extract
+- [ ] **7** — Compression and image conversion
+- [ ] **8** — Text watermark
+- [ ] **9** — Dashboard and history
+- [ ] **10** — AI: text extraction, summaries, ask-your-PDF
+- [ ] **11** — Hardening: accessibility, security, performance
+- [ ] **12** — Deployment
 
 ## Privacy
 
