@@ -29,9 +29,12 @@ playwright-report/
 blob-report/
 
 # --- Runtime storage (uploaded / processed / temp files) ---
-storage/
-uploads/
-tmp/
+# Anchored to the backend root on purpose. A bare "storage/" also matches
+# app/services/storage/, which silently kept the storage package out of a
+# commit and broke CI while every local run passed.
+/backend/storage/
+/backend/uploads/
+/backend/tmp/
 
 # --- Editor / OS ---
 .vscode/*
