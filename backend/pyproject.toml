@@ -38,6 +38,13 @@ exclude = ["\\.venv", "migrations/versions"]
 module = ["slowapi.*", "pdfplumber.*", "fitz.*", "pymupdf.*"]
 ignore_missing_imports = true
 
+[[tool.mypy.overrides]]
+# PyMuPDF ships partial annotations: its classes are untyped, so strict mode
+# rejects every call. Allow untyped calls in the modules that use it rather
+# than dropping strictness across the whole codebase.
+module = ["app.services.files.service", "app.services.pdf.*"]
+disallow_untyped_calls = false
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"

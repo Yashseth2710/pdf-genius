@@ -117,6 +117,76 @@ server-side — the client discards the token. The endpoint exists so the
 frontend has one call to make, and so revocation can be added here later
 without changing the client.
 
+## Documents
+
+All of these require a token, and every one is scoped to the signed-in user.
+
+### `POST /documents/upload`
+
+`multipart/form-data` with a single `file` field. Rate limited to 30 a minute.
+
+Accepts PDF, JPG and PNG up to `MAX_UPLOAD_SIZE_MB` (25 by default).
+
+```jsonc
+// 201
+{
+  "success": true,
+  "data": {
+    "id": "8c1f...",
+    "original_filename": "report.pdf",
+    "mime_type": "application/pdf",
+    "file_size": 184320,
+    "page_count": 12,
+    "status": "READY",
+    "created_at": "2026-08-11T16:40:02Z"
+  }
+}
+```
+
+**The file type is decided by reading the file, not by trusting the caller.**
+The filename and the `Content-Type` header are both supplied by whoever is
+uploading, so neither is consulted: a `.exe` renamed to `.pdf` is rejected with
+415. A file that starts with `%PDF-` but does not open is rejected with 422, and
+nothing is left on disk in either case.
+
+| Failure | Status | Code |
+| --- | --- | --- |
+| Not a PDF/JPG/PNG | 415 | `UNSUPPORTED_FILE_TYPE` |
+| Corrupt, empty or password-protected PDF | 422 | `INVALID_FILE` |
+| Over the size limit | 413 | `FILE_TOO_LARGE` |
+
+Note what the response does **not** contain: `storage_path`. Where a file
+physically lives is internal.
+
+### `GET /documents?limit=20&offset=0`
+
+Newest first. `limit` is 1–100.
+
+```jsonc
+{ "success": true, "data": { "items": [ /* documents */ ], "total": 42, "limit": 20, "offset": 0 } }
+```
+
+### `GET /documents/{id}`
+
+One document. Another user's document returns **404, not 403** — a 403 would
+confirm the id exists.
+
+### `GET /documents/{id}/download`
+
+Streams the file back with `Content-Disposition: attachment`. The filename is
+the user's original, stripped of anything that could carry a path or break the
+header (`../../etc/passwd.pdf` becomes `passwd.pdf`).
+
+The client asks for a document **by id and never names a path**.
+
+### `DELETE /documents/{id}`
+
+Removes the record, then the file.
+
+```jsonc
+{ "success": true, "data": { "id": "8c1f...", "deleted": true } }
+```
+
 ## Health
 
 ### `GET /health`

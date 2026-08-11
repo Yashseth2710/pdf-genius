@@ -17,9 +17,11 @@ from fastapi.testclient import TestClient
 from sqlalchemy import Engine, create_engine
 from sqlalchemy.orm import Session
 
+from app.api.deps import get_storage
 from app.core.database import get_db
 from app.core.rate_limit import limiter
 from app.main import create_app
+from app.services.storage.local import LocalStorage
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 
@@ -80,13 +82,41 @@ def db(engine: Engine) -> Iterator[Session]:
 
 
 @pytest.fixture
-def api_client(db: Session) -> Iterator[TestClient]:
-    """A test client whose requests run in the same rolled-back transaction."""
+def storage(tmp_path: Path) -> LocalStorage:
+    """Storage under a temporary directory, thrown away after each test."""
+    return LocalStorage(tmp_path / "storage")
+
+
+@pytest.fixture
+def api_client(db: Session, storage: LocalStorage) -> Iterator[TestClient]:
+    """A test client whose requests run in the same rolled-back transaction.
+
+    Storage is redirected to a temporary directory too, so a test can never
+    write into the real ./storage folder.
+    """
     app = create_app()
     app.dependency_overrides[get_db] = lambda: db
+    app.dependency_overrides[get_storage] = lambda: storage
     # Limits are per-process and would otherwise leak between tests, so start
     # each test with a clean slate.
     limiter.reset()
     with TestClient(app) as client:
         yield client
     app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def authed_client(api_client: TestClient) -> TestClient:
+    """A client that has registered and carries the resulting token."""
+    response = api_client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "owner@example.com",
+            "password": "a-good-long-password",
+            "first_name": "Ada",
+            "last_name": "Lovelace",
+        },
+    )
+    token = response.json()["data"]["access_token"]
+    api_client.headers.update({"Authorization": f"Bearer {token}"})
+    return api_client

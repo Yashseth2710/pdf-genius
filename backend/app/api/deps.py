@@ -6,11 +6,13 @@ from fastapi import Depends
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.database import get_db
 from app.core.errors import AuthenticationError
 from app.core.security import decode_access_token
 from app.models import User
 from app.services.auth import AuthService
+from app.services.storage import LocalStorage, Storage
 
 # auto_error=False so a missing header raises our own error, in our own
 # envelope, rather than FastAPI's default JSON shape.
@@ -41,3 +43,15 @@ def get_current_user(
 
 
 CurrentUser = Annotated[User, Depends(get_current_user)]
+
+
+def get_storage() -> Storage:
+    """The storage backend.
+
+    Local disk today. Swapping in object storage means returning a different
+    implementation here, with no route or service changing.
+    """
+    return LocalStorage(get_settings().storage_root)
+
+
+StorageDep = Annotated[Storage, Depends(get_storage)]
