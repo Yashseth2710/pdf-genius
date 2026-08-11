@@ -104,7 +104,11 @@ export function PdfSingleSelect({
 
   return (
     <RadioGroup
-      value={value ?? undefined}
+      // `value` is passed through as null, never as undefined: Base UI decides
+      // on first render whether a group is controlled, and treats undefined as
+      // uncontrolled. Collapsing null to undefined made the group flip from
+      // uncontrolled to controlled the moment a PDF was chosen.
+      value={value}
       onValueChange={(next) => onChange(String(next))}
       aria-label="Choose a PDF"
     >
