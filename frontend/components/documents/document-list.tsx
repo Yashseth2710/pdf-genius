@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { PreviewButton } from '@/components/tools/preview-button'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ApiError } from '@/lib/api'
@@ -180,6 +181,10 @@ function DocumentRow({
 
       {/* The icons carry an aria-label for screen readers; the tooltip is what
           tells a sighted user what the icon does before they click it. */}
+      {document.mime_type === 'application/pdf' && (
+        <PreviewButton documentId={document.id} filename={document.original_filename} />
+      )}
+
       <Tooltip>
         <TooltipTrigger
           render={

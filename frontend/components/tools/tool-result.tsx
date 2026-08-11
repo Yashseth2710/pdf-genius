@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { PreviewButton } from '@/components/tools/preview-button'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { downloadDocument } from '@/lib/documents'
 import { formatBytes, formatPages } from '@/lib/format'
@@ -64,6 +65,15 @@ export function ToolResult({ output, onReset }: { output: DocumentSummary; onRes
       </div>
 
       <div className="flex flex-wrap gap-2">
+        {/* Checking the result is right before downloading it is the whole
+            point of having a preview at all. Archives have nothing to draw. */}
+        {!isArchive && (
+          <PreviewButton
+            documentId={output.id}
+            filename={output.original_filename}
+            appearance="button"
+          />
+        )}
         <Button onClick={handleDownload} disabled={isDownloading}>
           {isDownloading ? (
             <Loader2 className="animate-spin" aria-hidden />

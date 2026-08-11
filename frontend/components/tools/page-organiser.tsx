@@ -101,6 +101,8 @@ export function PageOrganiser({
 
           <PageGrid
             document={document}
+            documentId={documentId}
+            filename={filename}
             plan={plan}
             onMove={(key, to) => setPlan((current) => moveByKey(current, key, to))}
             onRotate={(key, degrees) => setPlan((current) => rotate(current, key, degrees))}

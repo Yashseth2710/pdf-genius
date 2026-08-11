@@ -188,6 +188,65 @@ test('a page opens full screen and can be walked through', async ({ page }) => {
   await expect(viewer).toBeHidden()
 })
 
+test('a page opens showing the whole page, and can be zoomed in', async ({ page }) => {
+  await signUp(page)
+  await upload(page, 'report.pdf', 2)
+
+  await page.getByRole('link', { name: 'report.pdf' }).click()
+  await page.getByRole('button', { name: 'View page 1 full screen' }).click()
+
+  const viewer = page.getByRole('dialog')
+  const canvas = viewer.locator('canvas')
+  await expect(canvas).toBeVisible()
+  await expect(viewer).toContainText('Fit page')
+
+  // The whole page fits inside the area it is drawn in. Before this, the page
+  // was scaled to the window's width and an A4 page ran far off the bottom.
+  const fitted = await canvas.evaluate((element) => ({
+    page: element.clientHeight,
+    stage: element.closest('[data-slot="dialog-content"]')!.clientHeight,
+  }))
+  expect(fitted.page).toBeLessThanOrEqual(fitted.stage)
+
+  await viewer.getByRole('button', { name: 'Zoom in' }).click()
+  await expect(viewer).toContainText('125%')
+  await expect
+    .poll(async () => canvas.evaluate((element) => element.clientHeight))
+    .toBeGreaterThan(fitted.page)
+
+  await viewer.getByRole('button', { name: 'Fit the whole page' }).click()
+  await expect(viewer).toContainText('Fit page')
+})
+
+test('a PDF can be previewed from the tool that is about to change it', async ({ page }) => {
+  await signUp(page)
+  await upload(page, 'report.pdf', 3)
+
+  await page.goto('/dashboard/tools/split')
+  await page.getByRole('button', { name: 'Preview report.pdf' }).click()
+
+  const viewer = page.getByRole('dialog')
+  await expect(viewer).toContainText('page 1 of 3')
+  await expect(viewer.locator('canvas')).toBeVisible()
+})
+
+test('a result can be checked before it is downloaded', async ({ page }) => {
+  await signUp(page)
+  await upload(page, 'report.pdf', 5)
+
+  await page.goto('/dashboard/tools/split')
+  await page.getByRole('radio', { name: /report\.pdf/ }).click()
+  await page.getByLabel('Pages to split out').fill('2-3')
+  await page.getByRole('button', { name: 'Split PDF' }).click()
+
+  const result = page.getByRole('status', { name: 'Result' })
+  await expect(result).toBeVisible()
+  await result.getByRole('button', { name: /^Preview/ }).click()
+
+  // Two pages came out, and they can be looked at without downloading first.
+  await expect(page.getByRole('dialog')).toContainText('page 1 of 2')
+})
+
 test('an archive says to download it rather than pretending to preview', async ({ page }) => {
   await signUp(page)
   await upload(page, 'report.pdf', 4)

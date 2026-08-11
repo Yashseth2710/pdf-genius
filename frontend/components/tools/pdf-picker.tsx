@@ -3,6 +3,7 @@
 import { FileText } from 'lucide-react'
 import Link from 'next/link'
 
+import { PreviewButton } from '@/components/tools/preview-button'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -126,6 +127,9 @@ export function PdfSingleSelect({
             <span className="block truncate text-sm font-medium">{document.original_filename}</span>
             <span className="text-muted-foreground block text-xs">{meta(document)}</span>
           </span>
+          {/* Checking you picked the right file should not mean leaving the
+              tool and coming back. */}
+          <PreviewButton documentId={document.id} filename={document.original_filename} />
         </label>
       ))}
     </RadioGroup>
@@ -170,6 +174,7 @@ export function PdfMultiSelect({
                 </span>
                 <span className="text-muted-foreground block text-xs">{meta(document)}</span>
               </span>
+              <PreviewButton documentId={document.id} filename={document.original_filename} />
             </label>
           </li>
         )
