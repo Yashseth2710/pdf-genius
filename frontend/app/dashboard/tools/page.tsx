@@ -2,6 +2,8 @@ import { Combine, LayoutGrid, Scissors } from 'lucide-react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
+import { BackLink } from '@/components/shared/back-link'
+
 export const metadata: Metadata = {
   title: 'Tools',
 }
@@ -38,6 +40,7 @@ export default function ToolsPage() {
   return (
     <div className="space-y-8">
       <div>
+        <BackLink href="/dashboard">Your documents</BackLink>
         <h1 className="text-2xl font-semibold tracking-tight">Tools</h1>
         <p className="text-muted-foreground mt-1">
           Everything here works on the PDFs already in your documents.

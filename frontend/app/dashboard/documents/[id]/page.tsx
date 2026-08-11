@@ -1,12 +1,13 @@
 'use client'
 
 import { useQuery } from '@tanstack/react-query'
-import { ArrowLeft, Download, LayoutGrid, Loader2 } from 'lucide-react'
+import { Download, LayoutGrid, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
+import { BackLink } from '@/components/shared/back-link'
 import { PageThumbnail } from '@/components/tools/page-thumbnail'
 import { PageViewer } from '@/components/tools/page-viewer'
 import { usePdfDocument } from '@/components/tools/use-pdf-document'
@@ -87,13 +88,7 @@ export default function DocumentPreviewPage() {
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          href="/dashboard"
-          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'mb-3 -ml-2')}
-        >
-          <ArrowLeft aria-hidden />
-          All documents
-        </Link>
+        <BackLink href="/dashboard">All documents</BackLink>
 
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
