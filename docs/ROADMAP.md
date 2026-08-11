@@ -19,8 +19,8 @@ A scope is finished only when all of this is true (spec section 64):
 | 2  | Data model and migrations | S    | 1          | ✅ Done |
 | 3  | Authentication            | L    | 2          | ✅ Done |
 | 4  | File infrastructure       | L    | 3          | ✅ Done |
-| 5  | Merge and split           | M    | 4          | Next   |
-| 6  | Page organisation         | L    | 5          |        |
+| 5  | Merge and split           | M    | 4          | ✅ Done |
+| 6  | Page organisation         | L    | 5          | Next   |
 | 7  | Compression and conversion| M    | 4          |        |
 | 8  | Watermark                 | S    | 4          |        |
 | 9  | Dashboard and history     | M    | 5–8        |        |
@@ -106,17 +106,35 @@ than being built twice.
 
 ---
 
-## 5. Merge and split
+## 5. Merge and split ✅
 
 The first real tools, and the template every later tool copies.
 
-- Merge: 2–20 PDFs, drag to reorder, corrupted-file detection
-- Split: by page ranges (`1-3, 5, 8-10`), every page, or selected pages; ZIP when
-  the result is multiple files
-- A shared `ProcessingJob` lifecycle and the tool-page layout from section 37
+**Shipped — backend:** merge (2–20 PDFs, in the order given), split by page
+ranges, into every page, or into a selection; several outputs bundled as a ZIP.
+A `ProcessingJob` row for every run, with `GET /jobs` to read them back. The
+page-range parser explains what is wrong with the text a user typed rather than
+reporting "invalid format".
 
-**Tests:** page counts and order verified by reopening the output, single-page
-input, 100+ page input, duplicate files.
+**Shipped — frontend:** a tools index and the tool-page layout from section 37
+that every later tool copies — numbered steps, then the result. Merge has
+drag-to-reorder (dnd-kit) with move-up/down buttons so it works from a keyboard
+too. Results are documents like any other, downloadable straight from the
+result panel.
+
+**Shipped — tests:** 27 unit tests that reopen the produced bytes and check
+which pages actually came out, 22 for the range parser, 29 end to end against a
+real database, 17 frontend and 9 Playwright.
+
+**Decided:** jobs run inside the request. A queue would mean Redis or Celery —
+a running cost and a second process — for work that takes under a second. The
+job row is written either way, so moving to a queue later changes the execution
+and not the data.
+
+**Also fixed here:** `created_at` used PostgreSQL's `now()`, which is the time
+the *transaction* began and does not advance while it runs. Two rows written by
+one request got identical timestamps and "newest first" between them was
+arbitrary. Now `clock_timestamp()`.
 
 ---
 

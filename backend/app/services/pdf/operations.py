@@ -1,0 +1,184 @@
+"""The PDF work itself: merging documents and splitting one apart.
+
+Everything here takes bytes and returns bytes. Nothing in this module knows
+about the database, the storage layer, HTTP or who is signed in, which is what
+makes it testable by simply reopening the output and counting pages.
+
+PyMuPDF holds documents in memory, so the callers above enforce the size and
+count limits from settings before anything reaches these functions.
+"""
+
+import logging
+import zipfile
+from collections.abc import Sequence
+from dataclasses import dataclass
+from io import BytesIO
+
+import pymupdf
+
+from app.core.errors import InvalidFileError, ProcessingError
+from app.services.pdf.ranges import PageRange
+from app.services.storage.keys import safe_download_name
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class SourcePdf:
+    """One input to an operation: its bytes and the name to blame in an error."""
+
+    name: str
+    data: bytes
+
+
+@dataclass(frozen=True)
+class OutputFile:
+    """One produced file, named as the user will see it."""
+
+    filename: str
+    data: bytes
+    page_count: int
+
+
+def open_pdf(source: SourcePdf) -> pymupdf.Document:
+    """Open a source PDF, turning every failure into something we can show.
+
+    These files have already passed validation on upload, so a failure here
+    usually means the stored file has been damaged since - still the user's
+    problem to see, and still not a stack trace.
+    """
+    try:
+        document: pymupdf.Document = pymupdf.open(stream=source.data, filetype="pdf")
+    except Exception as exc:
+        logger.info("Could not open %r for processing: %s", source.name, exc.__class__.__name__)
+        raise InvalidFileError(f"'{source.name}' could not be opened. It may be damaged.") from exc
+
+    if document.needs_pass:
+        document.close()
+        raise InvalidFileError(f"'{source.name}' is password protected. Remove the password first.")
+
+    if document.page_count == 0:
+        document.close()
+        raise InvalidFileError(f"'{source.name}' has no pages.")
+
+    return document
+
+
+def merge(sources: Sequence[SourcePdf]) -> OutputFile:
+    """Join several PDFs into one, in the order given.
+
+    The order is the caller's, not ours: it is what the user dragged the files
+    into, and reordering it here would silently ignore them.
+    """
+    if len(sources) < 2:
+        raise ProcessingError("Choose at least two PDFs to merge.")
+
+    merged: pymupdf.Document = pymupdf.open()
+    try:
+        for source in sources:
+            with open_pdf(source) as document:
+                merged.insert_pdf(document)
+
+        data = bytes(merged.tobytes())
+        page_count = merged.page_count
+    finally:
+        merged.close()
+
+    return OutputFile(filename="merged.pdf", data=data, page_count=page_count)
+
+
+def _extract(source: pymupdf.Document, first: int, last: int) -> bytes:
+    """A new PDF holding pages ``first``..``last`` (0-based, inclusive)."""
+    part: pymupdf.Document = pymupdf.open()
+    try:
+        part.insert_pdf(source, from_page=first, to_page=last)
+        return bytes(part.tobytes())
+    finally:
+        part.close()
+
+
+def split_by_ranges(source: SourcePdf, ranges: Sequence[PageRange]) -> list[OutputFile]:
+    """One output file per range, named after the pages it contains."""
+    stem = stem_of(source.name)
+    outputs: list[OutputFile] = []
+
+    with open_pdf(source) as document:
+        for page_range in ranges:
+            first, last = page_range.indices()
+            outputs.append(
+                OutputFile(
+                    filename=f"{stem}-{page_range.label}.pdf",
+                    data=_extract(document, first, last),
+                    page_count=page_range.page_count,
+                )
+            )
+
+    return outputs
+
+
+def split_every_page(source: SourcePdf) -> list[OutputFile]:
+    """One output file per page."""
+    stem = stem_of(source.name)
+    outputs: list[OutputFile] = []
+
+    with open_pdf(source) as document:
+        # Zero-padded so a 12-page document sorts as 01, 02 ... 12 rather than
+        # 1, 10, 11, 12, 2 in whatever the user unzips it with.
+        width = len(str(document.page_count))
+        for index in range(document.page_count):
+            outputs.append(
+                OutputFile(
+                    filename=f"{stem}-page-{index + 1:0{width}d}.pdf",
+                    data=_extract(document, index, index),
+                    page_count=1,
+                )
+            )
+
+    return outputs
+
+
+def extract_pages(source: SourcePdf, pages: Sequence[int]) -> OutputFile:
+    """A single PDF holding the chosen 1-based pages, in the order given."""
+    stem = stem_of(source.name)
+
+    with open_pdf(source) as document:
+        part: pymupdf.Document = pymupdf.open()
+        try:
+            for page in pages:
+                part.insert_pdf(document, from_page=page - 1, to_page=page - 1)
+            data = bytes(part.tobytes())
+            page_count = part.page_count
+        finally:
+            part.close()
+
+    return OutputFile(filename=f"{stem}-selected-pages.pdf", data=data, page_count=page_count)
+
+
+def to_zip(outputs: Sequence[OutputFile], filename: str) -> OutputFile:
+    """Bundle several outputs into one archive.
+
+    Deflate rather than store: the parts are PDFs, which are already compressed
+    internally, but the gain is real on text-heavy pages and costs little.
+    """
+    buffer = BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for output in outputs:
+            # Names inside the archive are ours, but they descend from the
+            # user's filename, so they are cleaned the same way a download
+            # header would be.
+            archive.writestr(safe_download_name(output.filename), output.data)
+
+    return OutputFile(
+        filename=filename,
+        data=buffer.getvalue(),
+        # A zip has no pages of its own, and claiming the total would be a lie
+        # about a single document.
+        page_count=0,
+    )
+
+
+def stem_of(filename: str) -> str:
+    """The filename without its extension, safe to build new names from."""
+    name = safe_download_name(filename)
+    stem = name.rsplit(".", 1)[0] if "." in name else name
+    return stem[:80] or "document"

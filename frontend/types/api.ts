@@ -67,6 +67,46 @@ export interface DocumentListPage {
   offset: number
 }
 
+export type JobStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
+
+export type OperationType =
+  'MERGE' | 'SPLIT' | 'COMPRESS' | 'CONVERT' | 'ROTATE' | 'EXTRACT' | 'WATERMARK' | 'OCR'
+
+/** A record of one operation. Never includes where the output is stored. */
+export interface Job {
+  id: string
+  operation: OperationType
+  status: JobStatus
+  document_id: string | null
+  options: Record<string, unknown>
+  /** Written for the user, never a stack trace. */
+  error_message: string | null
+  created_at: string
+  completed_at: string | null
+}
+
+/** What a finished tool run returns: the job, and the document it produced. */
+export interface ToolRun {
+  job: Job
+  output: DocumentSummary
+}
+
+export interface MergeInput {
+  document_ids: string[]
+  output_name?: string
+}
+
+export type SplitMode = 'ranges' | 'every_page' | 'pages'
+
+export interface SplitInput {
+  document_id: string
+  mode: SplitMode
+  /** For mode "ranges": free text as typed, e.g. "1-3, 5, 8-10". */
+  ranges?: string
+  /** For mode "pages": 1-based page numbers. */
+  pages?: number[]
+}
+
 export interface RegisterInput {
   email: string
   password: string

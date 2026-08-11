@@ -136,6 +136,7 @@ jobs:
       RATE_LIMIT_REGISTER: 1000/minute
       RATE_LIMIT_LOGIN: 1000/minute
       RATE_LIMIT_UPLOAD: 1000/minute
+      RATE_LIMIT_PROCESSING: 1000/minute
 
     steps:
       - uses: actions/checkout@v5

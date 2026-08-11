@@ -44,12 +44,22 @@ class Settings(BaseSettings):
     rate_limit_register: str = "5/minute"
     rate_limit_login: str = "10/minute"
     rate_limit_upload: str = "30/minute"
+    # Processing is CPU work, not a database read, so it gets its own limit.
+    rate_limit_processing: str = "20/minute"
 
     # --- Storage ---
     storage_provider: str = "local"
     storage_root: Path = Path("./storage")
     max_upload_size_mb: int = 25
     allowed_upload_types: str = "application/pdf,image/jpeg,image/png"
+
+    # --- Processing limits ---
+    # PyMuPDF does its work in memory, so these caps are what stand between a
+    # free-tier host and an out-of-memory kill. They are settings rather than
+    # constants because the right ceiling depends on where this is deployed.
+    max_merge_files: int = 20
+    max_merge_total_mb: int = 100
+    max_split_outputs: int = 100
 
     # --- Retention ---
     output_retention_hours: int = 24
@@ -86,6 +96,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def max_merge_total_bytes(self) -> int:
+        return self.max_merge_total_mb * 1024 * 1024
 
     @property
     def is_production(self) -> bool:

@@ -187,6 +187,113 @@ Removes the record, then the file.
 { "success": true, "data": { "id": "8c1f...", "deleted": true } }
 ```
 
+## Tools
+
+Both tools run **inside the request**. A merge of a handful of PDFs finishes in
+well under a second, and a queue would mean Redis or Celery — a running cost
+and a second process, for work that is already fast. A `ProcessingJob` row is
+still written for every run, so history works and moving to a queue later
+changes the execution, not the data.
+
+Every run produces **exactly one output document**, saved like any upload: it
+appears in `GET /documents`, downloads through `GET /documents/{id}/download`,
+and is deleted the same way. Where several files come out of a split, they are
+bundled into one ZIP.
+
+### `POST /tools/merge`
+
+```jsonc
+{ "document_ids": ["8c1f...", "3a90..."], "output_name": "assignment.pdf" }
+```
+
+Two to twenty PDFs. **The order of `document_ids` is the order of the pages** —
+it is what the user dragged the files into, and the server does not reorder it.
+`output_name` is optional and defaults to `merged.pdf`.
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "job": { "id": "…", "operation": "MERGE", "status": "COMPLETED", "options": { }, "error_message": null },
+    "output": { "id": "…", "original_filename": "assignment.pdf", "mime_type": "application/pdf", "page_count": 12 }
+  }
+}
+```
+
+| Failure | Status | Code |
+| --- | --- | --- |
+| Fewer than 2, or more than 20 | 422 | `VALIDATION_ERROR` / `PROCESSING_FAILED` |
+| A document is not a PDF | 422 | `PROCESSING_FAILED` |
+| A document is not yours, or does not exist | 404 | `NOT_FOUND` |
+| Inputs over 100MB together | 422 | `PROCESSING_FAILED` |
+| A stored file is damaged | 422 | `INVALID_FILE` |
+
+A document belonging to someone else returns **404**, exactly as it does
+elsewhere: listing an id alongside your own must not confirm it exists.
+
+### `POST /tools/split`
+
+```jsonc
+{ "document_id": "8c1f...", "mode": "ranges", "ranges": "1-3, 5, 8-10" }
+```
+
+`mode` decides which other field is used:
+
+| mode | field | result |
+| --- | --- | --- |
+| `ranges` | `ranges` — `"1-3, 5, 8-10"` | one PDF per range; a ZIP when there is more than one |
+| `every_page` | — | one PDF per page, always a ZIP |
+| `pages` | `pages` — `[2, 5, 9]` | a single PDF holding those pages, in that order |
+
+Ranges are 1-based and inclusive, may overlap, and come out in the order
+written. Rejections name the problem rather than reporting "invalid format":
+
+| Input | Message |
+| --- | --- |
+| `all` | `'all' is not a page or a range. Use numbers like 5, or ranges like 8-10.` |
+| `9-5` | `'9-5' runs backwards. Write the lower page first, as 5-9.` |
+| `8-12` on a 10-page PDF | `'8-12' goes past the end of the document, which has 10 pages.` |
+| `0-3` | `Pages are numbered from 1, so there is no page 0.` |
+
+All of these return **422** with code `INVALID_PAGE_RANGE`. Splitting a
+one-page document with `every_page`, or asking for more than 100 output files,
+returns 422 with `PROCESSING_FAILED`.
+
+## Jobs
+
+### `GET /jobs?limit=20&offset=0&operation=MERGE`
+
+Your processing history, newest first. `operation` is optional.
+
+```jsonc
+{
+  "success": true,
+  "data": {
+    "items": [
+      {
+        "id": "…",
+        "operation": "SPLIT",
+        "status": "COMPLETED",
+        "document_id": "8c1f...",
+        "options": { "mode": "ranges", "ranges": "1-3, 5" },
+        "error_message": null,
+        "created_at": "2026-08-11T21:04:00Z",
+        "completed_at": "2026-08-11T21:04:01Z"
+      }
+    ],
+    "total": 1, "limit": 20, "offset": 0
+  }
+}
+```
+
+`document_id` is the input, and is `null` for a merge, which has several — the
+inputs are recorded in `options` instead. As with documents, **`output_path` is
+never returned**: the result is reached by its document id.
+
+### `GET /jobs/{id}`
+
+One job. Someone else's job returns 404.
+
 ## Health
 
 ### `GET /health`
@@ -207,4 +314,5 @@ the database cannot be reached.
 
 ## Coming in later scopes
 
-`/documents`, `/pdf/*`, `/ai/*` and `/history` — see [ROADMAP.md](ROADMAP.md).
+`/tools/compress`, `/tools/convert`, `/tools/rotate`, `/tools/watermark` and
+`/ai/*` — see [ROADMAP.md](ROADMAP.md).

@@ -1,8 +1,11 @@
 'use client'
 
 import { useQueryClient } from '@tanstack/react-query'
+import { Combine, Scissors } from 'lucide-react'
+import Link from 'next/link'
 
 import { DocumentList } from '@/components/documents/document-list'
+import { buttonVariants } from '@/components/ui/button'
 import { UploadZone } from '@/components/upload/upload-zone'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -17,8 +20,21 @@ export default function DashboardPage() {
           Welcome{user ? `, ${user.first_name}` : ''}
         </h1>
         <p className="text-muted-foreground mt-1">
-          Upload a document to get started. The tools arrive next.
+          Upload a document, then put one of the tools to work on it.
         </p>
+      </div>
+
+      {/* Two shortcuts rather than the full quick-tools panel: that belongs
+          with the dashboard proper in scope 9, once there is more to show. */}
+      <div className="flex flex-wrap gap-2">
+        <Link href="/dashboard/tools/merge" className={buttonVariants({ variant: 'outline' })}>
+          <Combine aria-hidden />
+          Merge PDFs
+        </Link>
+        <Link href="/dashboard/tools/split" className={buttonVariants({ variant: 'outline' })}>
+          <Scissors aria-hidden />
+          Split a PDF
+        </Link>
       </div>
 
       <UploadZone

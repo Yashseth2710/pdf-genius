@@ -70,10 +70,13 @@ class AIMessage(UUIDPrimaryKey, Base):
     content: Mapped[str] = mapped_column(Text, nullable=False)
 
     # Messages are appended and never edited, so this table carries created_at
-    # on its own rather than the full Timestamps mixin.
+    # on its own rather than the full Timestamps mixin. clock_timestamp() for
+    # the reason given in mixins.Timestamps, and it matters most here: a
+    # question and its answer are written in the same transaction, and now()
+    # would give them the same timestamp and no reliable order.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        server_default=func.clock_timestamp(),
         nullable=False,
     )
 

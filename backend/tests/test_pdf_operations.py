@@ -1,0 +1,282 @@
+"""Merging and splitting.
+
+Every assertion reopens the produced bytes and looks at what is actually in
+them. A merge that returns a plausible-looking PDF with the pages in the wrong
+order would pass any test that only counted them, so page identity is checked
+by writing a marker onto each page and reading it back.
+"""
+
+import zipfile
+from io import BytesIO
+
+import pymupdf
+import pytest
+
+from app.core.errors import InvalidFileError, ProcessingError
+from app.services.pdf import operations
+from app.services.pdf.operations import SourcePdf
+from app.services.pdf.ranges import PageRange
+
+
+def make_pdf(labels: list[str]) -> bytes:
+    """A PDF with one page per label, each stamped with its own text."""
+    with pymupdf.open() as document:
+        for label in labels:
+            page = document.new_page()
+            page.insert_text((72, 72), label, fontsize=24)
+        return bytes(document.tobytes())
+
+
+def labels_in(data: bytes) -> list[str]:
+    """The stamped text of each page, in order."""
+    with pymupdf.open(stream=data, filetype="pdf") as document:
+        return [page.get_text().strip() for page in document]
+
+
+def numbered(prefix: str, count: int) -> bytes:
+    return make_pdf([f"{prefix}{index}" for index in range(1, count + 1)])
+
+
+def source(name: str, data: bytes) -> SourcePdf:
+    return SourcePdf(name=name, data=data)
+
+
+# --- Merge -------------------------------------------------------------
+
+
+def test_merge_keeps_every_page() -> None:
+    result = operations.merge(
+        [source("a.pdf", numbered("A", 3)), source("b.pdf", numbered("B", 2))]
+    )
+
+    assert result.page_count == 5
+    assert len(labels_in(result.data)) == 5
+
+
+def test_merge_keeps_the_order_it_was_given() -> None:
+    # The order is what the user dragged the files into, so it is the one
+    # thing a merge must not quietly decide for itself.
+    result = operations.merge(
+        [source("b.pdf", numbered("B", 2)), source("a.pdf", numbered("A", 2))]
+    )
+
+    assert labels_in(result.data) == ["B1", "B2", "A1", "A2"]
+
+
+def test_merge_accepts_the_same_document_twice() -> None:
+    # Merging a cover page onto both ends of a report is a real thing to want.
+    same = numbered("A", 1)
+    result = operations.merge([source("a.pdf", same), source("a.pdf", same)])
+
+    assert labels_in(result.data) == ["A1", "A1"]
+
+
+def test_merge_handles_single_page_inputs() -> None:
+    result = operations.merge(
+        [source("a.pdf", numbered("A", 1)), source("b.pdf", numbered("B", 1))]
+    )
+
+    assert labels_in(result.data) == ["A1", "B1"]
+
+
+def test_merge_handles_a_long_document() -> None:
+    result = operations.merge(
+        [source("long.pdf", numbered("L", 120)), source("short.pdf", numbered("S", 1))]
+    )
+
+    assert result.page_count == 121
+
+
+def test_merge_refuses_a_single_file() -> None:
+    with pytest.raises(ProcessingError, match="at least two"):
+        operations.merge([source("a.pdf", numbered("A", 1))])
+
+
+def test_merge_names_the_file_that_could_not_be_opened() -> None:
+    # Naming it matters: with twenty inputs, "a file was corrupt" is useless.
+    with pytest.raises(InvalidFileError, match=r"'broken\.pdf'"):
+        operations.merge(
+            [source("fine.pdf", numbered("A", 1)), source("broken.pdf", b"%PDF-1.7\nnonsense")]
+        )
+
+
+def test_merge_output_is_a_readable_pdf() -> None:
+    result = operations.merge(
+        [source("a.pdf", numbered("A", 1)), source("b.pdf", numbered("B", 1))]
+    )
+
+    assert result.data.startswith(b"%PDF-")
+    assert result.filename == "merged.pdf"
+
+
+# --- Split by ranges ---------------------------------------------------
+
+
+def test_split_by_ranges_puts_the_right_pages_in_each_file() -> None:
+    outputs = operations.split_by_ranges(
+        source("report.pdf", numbered("P", 10)),
+        [PageRange(1, 3), PageRange(5, 5), PageRange(8, 10)],
+    )
+
+    assert [labels_in(item.data) for item in outputs] == [
+        ["P1", "P2", "P3"],
+        ["P5"],
+        ["P8", "P9", "P10"],
+    ]
+
+
+def test_split_by_ranges_names_files_after_the_pages_they_hold() -> None:
+    outputs = operations.split_by_ranges(
+        source("report.pdf", numbered("P", 10)), [PageRange(1, 3), PageRange(5, 5)]
+    )
+
+    assert [item.filename for item in outputs] == ["report-1-3.pdf", "report-5.pdf"]
+
+
+def test_split_by_ranges_reports_the_page_count_of_each_part() -> None:
+    outputs = operations.split_by_ranges(source("report.pdf", numbered("P", 10)), [PageRange(2, 6)])
+
+    assert outputs[0].page_count == 5
+
+
+def test_overlapping_ranges_each_get_their_own_file() -> None:
+    outputs = operations.split_by_ranges(
+        source("report.pdf", numbered("P", 5)), [PageRange(1, 3), PageRange(2, 4)]
+    )
+
+    assert [labels_in(item.data) for item in outputs] == [
+        ["P1", "P2", "P3"],
+        ["P2", "P3", "P4"],
+    ]
+
+
+# --- Split every page --------------------------------------------------
+
+
+def test_every_page_produces_one_file_per_page() -> None:
+    outputs = operations.split_every_page(source("report.pdf", numbered("P", 4)))
+
+    assert len(outputs) == 4
+    assert [labels_in(item.data) for item in outputs] == [["P1"], ["P2"], ["P3"], ["P4"]]
+
+
+def test_every_page_pads_numbers_so_they_sort_correctly() -> None:
+    # Without padding a file manager shows 1, 10, 11, 2 - which looks broken.
+    outputs = operations.split_every_page(source("report.pdf", numbered("P", 12)))
+
+    assert outputs[0].filename == "report-page-01.pdf"
+    assert outputs[11].filename == "report-page-12.pdf"
+
+
+def test_every_page_of_a_single_page_document_is_that_one_page() -> None:
+    outputs = operations.split_every_page(source("one.pdf", numbered("P", 1)))
+
+    assert len(outputs) == 1
+    assert outputs[0].filename == "one-page-1.pdf"
+
+
+# --- Extract selected pages --------------------------------------------
+
+
+def test_extract_returns_one_file_holding_the_chosen_pages() -> None:
+    result = operations.extract_pages(source("report.pdf", numbered("P", 10)), [2, 7, 9])
+
+    assert labels_in(result.data) == ["P2", "P7", "P9"]
+    assert result.page_count == 3
+
+
+def test_extract_respects_the_order_of_the_selection() -> None:
+    result = operations.extract_pages(source("report.pdf", numbered("P", 5)), [4, 1])
+
+    assert labels_in(result.data) == ["P4", "P1"]
+
+
+def test_extract_names_the_output_after_the_source() -> None:
+    result = operations.extract_pages(source("report.pdf", numbered("P", 5)), [1])
+
+    assert result.filename == "report-selected-pages.pdf"
+
+
+# --- Archives ----------------------------------------------------------
+
+
+def test_zip_contains_every_output_under_its_own_name() -> None:
+    outputs = operations.split_every_page(source("report.pdf", numbered("P", 3)))
+
+    archive = operations.to_zip(outputs, filename="report-split.zip")
+
+    with zipfile.ZipFile(BytesIO(archive.data)) as opened:
+        assert opened.namelist() == [
+            "report-page-1.pdf",
+            "report-page-2.pdf",
+            "report-page-3.pdf",
+        ]
+
+
+def test_files_inside_a_zip_are_still_readable_pdfs() -> None:
+    outputs = operations.split_every_page(source("report.pdf", numbered("P", 2)))
+
+    archive = operations.to_zip(outputs, filename="report-split.zip")
+
+    with zipfile.ZipFile(BytesIO(archive.data)) as opened:
+        assert labels_in(opened.read("report-page-1.pdf")) == ["P1"]
+
+
+def test_a_zip_reports_no_page_count_of_its_own() -> None:
+    outputs = operations.split_every_page(source("report.pdf", numbered("P", 3)))
+
+    assert operations.to_zip(outputs, filename="x.zip").page_count == 0
+
+
+# --- Opening sources ---------------------------------------------------
+
+
+def test_refuses_a_file_that_is_not_a_pdf() -> None:
+    with pytest.raises(InvalidFileError, match="could not be opened"):
+        operations.open_pdf(source("notes.pdf", b"this is not a pdf at all"))
+
+
+def test_refuses_a_pdf_with_no_pages() -> None:
+    # Written by hand rather than built: PyMuPDF refuses to save a document
+    # with zero pages, but it will happily open one, and a file like this can
+    # arrive from another tool.
+    empty = (
+        b"%PDF-1.4\n"
+        b"1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n"
+        b"2 0 obj<</Type/Pages/Kids[]/Count 0>>endobj\n"
+        b"trailer<</Root 1 0 R>>\n"
+        b"%%EOF\n"
+    )
+
+    with pytest.raises(InvalidFileError, match="no pages"):
+        operations.open_pdf(source("empty.pdf", empty))
+
+
+def test_refuses_a_password_protected_pdf() -> None:
+    with pymupdf.open() as document:
+        document.new_page()
+        # PyMuPDF exposes its encryption constants without annotations.
+        encryption = pymupdf.PDF_ENCRYPT_AES_256  # type: ignore[attr-defined]
+        locked = bytes(document.tobytes(encryption=encryption, user_pw="secret"))
+
+    with pytest.raises(InvalidFileError, match="password protected"):
+        operations.open_pdf(source("locked.pdf", locked))
+
+
+# --- Filenames ---------------------------------------------------------
+
+
+def test_output_names_never_inherit_a_path_from_the_source() -> None:
+    # The source name comes from whatever the user called their upload.
+    stem = operations.stem_of("../../etc/passwd.pdf")
+
+    assert "/" not in stem
+    assert ".." not in stem
+
+
+def test_a_source_with_no_extension_still_gives_a_usable_stem() -> None:
+    assert operations.stem_of("scan") == "scan"
+
+
+def test_an_unusable_name_falls_back_rather_than_producing_an_empty_one() -> None:
+    assert operations.stem_of("///") == "document"

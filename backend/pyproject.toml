@@ -48,7 +48,14 @@ ignore_missing_imports = true
 # PyMuPDF ships partial annotations: its classes are untyped, so strict mode
 # rejects every call. Allow untyped calls in the modules that use it rather
 # than dropping strictness across the whole codebase.
-module = ["app.services.files.service", "app.services.pdf.*"]
+module = [
+    "app.services.files.service",
+    "app.services.pdf.*",
+    # The tests build real PDFs to work on, so they call the same untyped API.
+    "tests.test_pdf_operations",
+    "tests.integration.test_documents_api",
+    "tests.integration.test_tools_api",
+]
 disallow_untyped_calls = false
 
 [tool.pytest.ini_options]

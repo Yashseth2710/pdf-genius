@@ -20,8 +20,7 @@ DOCUMENTS = "/api/v1/documents"
 
 def make_pdf(pages: int = 1) -> bytes:
     """A genuinely valid PDF, built rather than pasted as a byte blob."""
-    # PyMuPDF ships no type information for its constructor.
-    with pymupdf.open() as document:  # type: ignore[no-untyped-call]
+    with pymupdf.open() as document:
         for _ in range(pages):
             document.new_page()
         return bytes(document.tobytes())

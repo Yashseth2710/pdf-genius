@@ -1,7 +1,7 @@
 'use client'
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Download, FileImage, FileText, Loader2, Trash2 } from 'lucide-react'
+import { Download, FileArchive, FileImage, FileText, Loader2, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -13,6 +13,18 @@ import { formatBytes, formatPages } from '@/lib/format'
 import type { DocumentSummary } from '@/types/api'
 
 const PAGE_SIZE = 20
+
+/**
+ * Uploads are PDFs or images; a ZIP only ever arrives as a split result.
+ *
+ * A lookup rather than a function that returns a component: the lint rule for
+ * components created during render cannot tell the two apart, and it is right
+ * to be suspicious of the second.
+ */
+const ICONS: Record<string, typeof FileText> = {
+  'application/pdf': FileText,
+  'application/zip': FileArchive,
+}
 
 export function DocumentList() {
   const queryClient = useQueryClient()
@@ -129,7 +141,7 @@ function DocumentRow({
   isDeleting: boolean
 }) {
   const [isDownloading, setIsDownloading] = useState(false)
-  const Icon = document.mime_type === 'application/pdf' ? FileText : FileImage
+  const Icon = ICONS[document.mime_type] ?? FileImage
   const pages = formatPages(document.page_count)
 
   async function handleDownload() {

@@ -3,6 +3,7 @@
 import logging
 import uuid
 from collections.abc import Iterator, Sequence
+from io import BytesIO
 from typing import BinaryIO
 
 import pymupdf
@@ -17,9 +18,9 @@ from app.core.errors import (
 from app.models import Document, User
 from app.models.enums import DocumentStatus
 from app.repositories.document import DocumentRepository
-from app.services.files.validation import PDF, SNIFF_BYTES, sniff
+from app.services.files.validation import PDF, SNIFF_BYTES, ZIP, sniff
 from app.services.storage.base import Storage
-from app.services.storage.keys import new_document_key
+from app.services.storage.keys import new_document_key, new_output_key
 from app.services.storage.local import FileTooLargeInStorage
 
 logger = logging.getLogger(__name__)
@@ -102,6 +103,65 @@ class DocumentService:
             page_count,
         )
         return document
+
+    def store_output(
+        self,
+        *,
+        user: User,
+        data: bytes,
+        filename: str,
+        mime_type: str,
+        page_count: int | None,
+    ) -> Document:
+        """Save a file we produced as a document in its own right.
+
+        Results land in the same list as uploads, which means download, delete
+        and ownership all work through the code that already exists rather than
+        through a parallel set of endpoints for "outputs".
+
+        The key goes under ``outputs/`` rather than ``documents/`` so a future
+        retention sweep can tell the two apart: an upload is the user's only
+        copy, while a result can be produced again.
+        """
+        extension = "zip" if mime_type == ZIP else "pdf"
+        key = new_output_key(user.id, extension)
+
+        # No size check against the upload limit here: this file is ours, not
+        # the client's, and the ceiling on it was applied to the inputs.
+        stored = self.storage.save(BytesIO(data), key=key, max_bytes=len(data))
+
+        document = Document(
+            user_id=user.id,
+            original_filename=filename[:255],
+            storage_path=key,
+            mime_type=mime_type,
+            file_size=stored.size,
+            page_count=page_count,
+            status=DocumentStatus.READY,
+        )
+        try:
+            self.documents.add(document)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            self.storage.delete(key)
+            raise
+
+        logger.info("Stored output id=%s user=%s bytes=%d", document.id, user.id, stored.size)
+        return document
+
+    def read_bytes(self, document: Document) -> bytes:
+        """Load a stored document into memory for processing.
+
+        Processing genuinely needs the whole file - PyMuPDF cannot merge a
+        stream it has only partly seen - which is why the merge limits in
+        settings exist.
+        """
+        if not self.storage.exists(document.storage_path):
+            logger.error("Document id=%s has no file on disk", document.id)
+            raise NotFoundError("That document is no longer available.")
+        with self.storage.open(document.storage_path) as handle:
+            return handle.read()
 
     def _inspect_pdf(self, key: str) -> int:
         """Open the PDF to prove it is readable, and count its pages.

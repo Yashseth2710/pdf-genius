@@ -6,10 +6,9 @@ Merge, split, compress, convert, organise and understand PDF documents from a
 single place, instead of hopping between five different websites to finish one
 task.
 
-> **Status: in development.** The foundation (project structure, configuration,
-> database connection, error handling, health checks, CI) is in place. PDF tools,
-> authentication and AI features are being built phase by phase — see the
-> [roadmap](#roadmap).
+> **Status: in development.** Accounts, uploads and the first two PDF tools —
+> merge and split — work end to end. The remaining tools and the AI features are
+> being built scope by scope; see the [roadmap](#roadmap).
 
 ---
 
@@ -158,7 +157,7 @@ each one delivers and when it counts as finished.
 - [x] **2** — Data model and migrations
 - [x] **3** — Authentication
 - [x] **4** — File infrastructure: upload, validation, storage, download, delete
-- [ ] **5** — Merge and split
+- [x] **5** — Merge and split
 - [ ] **6** — Page organisation: rotate, delete, reorder, extract
 - [ ] **7** — Compression and image conversion
 - [ ] **8** — Text watermark

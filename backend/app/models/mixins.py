@@ -24,16 +24,23 @@ class UUIDPrimaryKey:
 
 
 class Timestamps:
-    """created_at / updated_at, both maintained by the database."""
+    """created_at / updated_at, both maintained by the database.
+
+    ``clock_timestamp()`` rather than ``now()``: PostgreSQL's ``now()`` is the
+    time the *transaction* began and does not move while it runs, so two rows
+    written by one request get byte-identical timestamps and any "newest first"
+    ordering between them is arbitrary. ``clock_timestamp()`` reads the actual
+    clock, which is what a created_at column is meant to record.
+    """
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        server_default=func.clock_timestamp(),
         nullable=False,
     )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
-        onupdate=func.now(),
+        server_default=func.clock_timestamp(),
+        onupdate=func.clock_timestamp(),
         nullable=False,
     )

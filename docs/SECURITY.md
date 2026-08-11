@@ -111,10 +111,32 @@ Partial files are removed on every failure path.
 `storage_path` is absent from every API response: where a file physically lives
 is internal.
 
+## Processing
+
+The PDF tools take **document ids, never files or paths**. Each id is resolved
+with the same ownership check as everything else, so listing someone else's
+document alongside your own in a merge returns 404 rather than reaching it.
+Output is written under a generated `outputs/<user id>/<uuid>` key.
+
+PyMuPDF works in memory, which is the real constraint on a free host: a merge
+of twenty 25MB files would be 500MB. Three limits stand in the way, all
+settings rather than constants — `MAX_MERGE_FILES` (20), `MAX_MERGE_TOTAL_MB`
+(100) and `MAX_SPLIT_OUTPUTS` (100). Beyond them the request is refused with an
+explanation instead of the process being killed.
+
+Filenames inside a ZIP descend from the user's own filename, so they are
+cleaned exactly as a `Content-Disposition` header is: an upload called
+`../../etc/passwd.pdf` becomes `passwd-1-3.pdf`, never a path.
+
+Because jobs run inside the request, a slow one occupies a worker for its
+duration. That is acceptable at this size and is the reason processing has its
+own, tighter rate limit.
+
 ## Rate limiting
 
 In-memory counters (slowapi): 5/minute on registration, 10/minute on sign-in,
-30/minute on upload. These are settings (`RATE_LIMIT_*`), not hard-coded
+30/minute on upload, 20/minute on processing — processing is CPU work rather
+than a database read. These are settings (`RATE_LIMIT_*`), not hard-coded
 values — an automated test run legitimately registers many accounts from one
 address, and so does an office behind a single NAT address.
 

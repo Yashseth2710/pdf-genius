@@ -10,6 +10,10 @@ from dataclasses import dataclass
 PDF = "application/pdf"
 JPEG = "image/jpeg"
 PNG = "image/png"
+# We produce zip archives when a split has several outputs, but we never accept
+# one: it is deliberately absent from the signature table below, so an uploaded
+# archive is not recognised and therefore refused.
+ZIP = "application/zip"
 
 # Enough bytes to identify every type we accept.
 SNIFF_BYTES = 16

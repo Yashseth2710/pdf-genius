@@ -21,6 +21,15 @@ export function SiteHeader() {
         <Logo href={isAuthenticated ? '/dashboard' : '/'} />
 
         <nav className="flex items-center gap-1 sm:gap-2" aria-label="Main">
+          {isAuthenticated && (
+            <Link
+              href="/dashboard/tools"
+              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
+            >
+              Tools
+            </Link>
+          )}
+
           <ThemeToggle />
 
           {isLoading ? (
