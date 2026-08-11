@@ -15,6 +15,10 @@ export async function listDocuments(limit = 20, offset = 0): Promise<DocumentLis
   })
 }
 
+export async function getDocument(id: string): Promise<DocumentSummary> {
+  return apiFetch<DocumentSummary>(`/documents/${id}`, { headers: authHeader() })
+}
+
 export async function deleteDocument(id: string): Promise<void> {
   await apiFetch(`/documents/${id}`, { method: 'DELETE', headers: authHeader() })
 }

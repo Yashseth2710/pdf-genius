@@ -154,6 +154,55 @@ def extract_pages(source: SourcePdf, pages: Sequence[int]) -> OutputFile:
     return OutputFile(filename=f"{stem}-selected-pages.pdf", data=data, page_count=page_count)
 
 
+@dataclass(frozen=True)
+class PlannedPage:
+    """One page of the document the user wants, and how it should sit.
+
+    ``number`` is 1-based, as printed on the page. ``rotation`` is clockwise
+    degrees *relative to how the page already sits*, so 0 means "leave it".
+    """
+
+    number: int
+    rotation: int = 0
+
+
+def apply_page_plan(source: SourcePdf, plan: Sequence[PlannedPage]) -> OutputFile:
+    """Rebuild a document from a list of the pages the user wants.
+
+    This one operation covers rotating, reordering, deleting and extracting,
+    because from the document's point of view they are the same edit: a page
+    that is dropped is simply absent from the plan, the order of the plan is
+    the order of the result, and a rotation is a property of the page. Doing it
+    any other way would need several passes for an edit the user made in one
+    go, each writing a document nobody asked for.
+    """
+    if not plan:
+        raise ProcessingError("A document needs at least one page.")
+
+    stem = stem_of(source.name)
+
+    with open_pdf(source) as document:
+        rebuilt: pymupdf.Document = pymupdf.open()
+        try:
+            for planned in plan:
+                index = planned.number - 1
+                rebuilt.insert_pdf(document, from_page=index, to_page=index)
+
+                if planned.rotation:
+                    page = rebuilt[rebuilt.page_count - 1]
+                    # Added to the rotation the page already carries, rather
+                    # than replacing it: a scan that arrives at 90 and is
+                    # turned once more belongs at 180, not at 90.
+                    page.set_rotation((page.rotation + planned.rotation) % 360)
+
+            data = bytes(rebuilt.tobytes())
+            page_count = rebuilt.page_count
+        finally:
+            rebuilt.close()
+
+    return OutputFile(filename=f"{stem}-organised.pdf", data=data, page_count=page_count)
+
+
 def to_zip(outputs: Sequence[OutputFile], filename: str) -> OutputFile:
     """Bundle several outputs into one archive.
 

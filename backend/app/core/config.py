@@ -60,6 +60,10 @@ class Settings(BaseSettings):
     max_merge_files: int = 20
     max_merge_total_mb: int = 100
     max_split_outputs: int = 100
+    # A page may appear more than once - duplicating a page is a real thing to
+    # want - so the organiser is capped on the size of the result, not on the
+    # size of the original.
+    max_organise_pages: int = 500
 
     # --- Retention ---
     output_retention_hours: int = 24

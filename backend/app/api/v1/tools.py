@@ -1,7 +1,7 @@
-"""The PDF tools: merge and split.
+"""The PDF tools: merge, organise and split.
 
-Both run inside the request. See ``app/services/jobs/service.py`` for why there
-is no worker behind them.
+All of them run inside the request. See ``app/services/jobs/service.py`` for
+why there is no worker behind them.
 """
 
 from fastapi import APIRouter, Request
@@ -12,7 +12,14 @@ from app.core.errors import AppError
 from app.core.rate_limit import limiter
 from app.schemas.common import SuccessResponse
 from app.schemas.document import DocumentResponse
-from app.schemas.job import JobResponse, MergeRequest, SplitRequest, ToolRunResponse
+from app.schemas.job import (
+    JobResponse,
+    MergeRequest,
+    OrganiseRequest,
+    SplitRequest,
+    ToolRunResponse,
+)
+from app.services.pdf.operations import PlannedPage
 from app.services.pdf.tools import ToolResult, ToolService
 
 router = APIRouter(prefix="/tools", tags=["tools"])
@@ -45,6 +52,34 @@ def merge_documents(
     result = service.merge(
         user=current_user,
         document_ids=payload.document_ids,
+        output_name=payload.output_name,
+    )
+    return _response(result)
+
+
+@router.post(
+    "/organise",
+    response_model=SuccessResponse[ToolRunResponse],
+    summary="Rotate, reorder and remove pages",
+)
+@limiter.limit(settings.rate_limit_processing)
+def organise_document(
+    request: Request,
+    payload: OrganiseRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+    storage: StorageDep,
+) -> SuccessResponse[ToolRunResponse]:
+    """Rebuild a document from the pages the user kept, in their order.
+
+    Rotating, reordering and deleting arrive together because that is how they
+    are done — one pass over the document, one job, one result.
+    """
+    service = ToolService(db, storage, settings)
+    result = service.organise(
+        user=current_user,
+        document_id=payload.document_id,
+        plan=[PlannedPage(number=page.number, rotation=page.rotation) for page in payload.pages],
         output_name=payload.output_name,
     )
     return _response(result)

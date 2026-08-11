@@ -231,6 +231,47 @@ it is what the user dragged the files into, and the server does not reorder it.
 A document belonging to someone else returns **404**, exactly as it does
 elsewhere: listing an id alongside your own must not confirm it exists.
 
+### `POST /tools/organise`
+
+```jsonc
+{
+  "document_id": "8c1f...",
+  "pages": [
+    { "number": 3, "rotation": 90 },
+    { "number": 1, "rotation": 0 }
+  ],
+  "output_name": "report-organised.pdf"
+}
+```
+
+**One request covers rotating, reordering and deleting**, because from the
+document's point of view they are the same edit: `pages` is the list of pages
+to keep, its order is the order of the result, a page left out is a page
+deleted, and `rotation` is clockwise degrees **added to however the page
+already sits** — so a scan already at 90 with `rotation: 90` ends up at 180.
+
+Four separate endpoints would each rebuild the whole document, so a user who
+turned one page and dropped another would pay for two passes and get two
+entries in their history for one edit.
+
+Pages are 1-based. A page may appear more than once — duplicating a cover sheet
+is a real request — so the limit is on the size of the result, not the original.
+`output_name` is optional and defaults to `<original>-organised.pdf`.
+
+| Failure | Status | Code |
+| --- | --- | --- |
+| A page the document does not have | 422 | `PROCESSING_FAILED` |
+| An empty `pages` list | 422 | `VALIDATION_ERROR` |
+| A rotation that is not 0, 90, 180 or 270 | 422 | `VALIDATION_ERROR` |
+| More than 500 pages in the result | 422 | `PROCESSING_FAILED` |
+| Not your document, or not a PDF | 404 / 422 | `NOT_FOUND` / `PROCESSING_FAILED` |
+
+The plan is checked **before a job starts**, so a request naming page 40 of a
+20-page document leaves no failed job behind: it never began processing.
+
+Jobs are recorded as `ORGANISE`, with the plan and the original page count in
+`options`.
+
 ### `POST /tools/split`
 
 ```jsonc

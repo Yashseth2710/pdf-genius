@@ -78,9 +78,15 @@ def test_enum_values_match_the_specification() -> None:
     assert [s.value for s in JobStatus] == ["QUEUED", "PROCESSING", "COMPLETED", "FAILED"]
     assert [r.value for r in MessageRole] == ["USER", "ASSISTANT"]
     assert [t.value for t in DocumentStatus] == ["UPLOADED", "READY", "FAILED"]
+    # ORGANISE is ours rather than the specification's: rotating, reordering
+    # and removing pages are applied together from one page plan, and a job
+    # that did all three at once could not honestly be called ROTATE. Added by
+    # migration c7e2b48f1a03. The order matters as much as the membership -
+    # these are stored as a native PostgreSQL enum.
     assert [o.value for o in OperationType] == [
         "MERGE",
         "SPLIT",
+        "ORGANISE",
         "COMPRESS",
         "CONVERT",
         "ROTATE",

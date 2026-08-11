@@ -25,6 +25,10 @@ class OperationType(StrEnum):
 
     MERGE = "MERGE"
     SPLIT = "SPLIT"
+    # Rotating, reordering and removing pages are one operation, not three:
+    # they are applied together from a single page plan, and a job that did
+    # all three at once could not honestly be labelled any one of them.
+    ORGANISE = "ORGANISE"
     COMPRESS = "COMPRESS"
     CONVERT = "CONVERT"
     ROTATE = "ROTATE"

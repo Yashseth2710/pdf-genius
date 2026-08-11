@@ -132,6 +132,19 @@ Because jobs run inside the request, a slow one occupies a worker for its
 duration. That is acceptable at this size and is the reason processing has its
 own, tighter rate limit.
 
+**The organiser rebuilds rather than edits.** A page plan produces a new
+document; the original is never rewritten, so a mistake costs a click rather
+than a file. Plans are checked against the real page count of the opened
+document — not the `page_count` column, which is a hint recorded at upload
+time — before any job starts, and `MAX_ORGANISE_PAGES` (500) caps the result,
+since a plan may repeat a page and so could ask for a document far larger than
+the one it came from.
+
+**Previews render in the browser, not on the server.** PDF.js draws pages from
+bytes already downloaded through the authenticated endpoint, so viewing a
+document costs the server nothing beyond the download it would have served
+anyway, and no page images are generated or stored anywhere.
+
 ## Rate limiting
 
 In-memory counters (slowapi): 5/minute on registration, 10/minute on sign-in,

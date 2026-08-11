@@ -24,7 +24,7 @@ from app.services.files.service import DocumentService
 from app.services.files.validation import PDF, ZIP
 from app.services.jobs import JobService
 from app.services.pdf import operations
-from app.services.pdf.operations import OutputFile, SourcePdf
+from app.services.pdf.operations import OutputFile, PlannedPage, SourcePdf
 from app.services.pdf.ranges import parse_page_numbers, parse_page_ranges
 from app.services.storage.base import Storage
 
@@ -163,6 +163,76 @@ class ToolService:
 
         self.jobs.complete(job, output_key=stored.storage_path)
         return ToolResult(job=job, output=stored)
+
+    # --- Organise -------------------------------------------------------
+
+    def organise(
+        self,
+        *,
+        user: User,
+        document_id: uuid.UUID,
+        plan: Sequence[PlannedPage],
+        output_name: str | None = None,
+    ) -> ToolResult:
+        """Rebuild a document from the pages the user kept, in their order."""
+        document = self.documents.get_owned(document_id, user)
+        source = self._as_source(document)
+        page_count = self._page_count(document, source)
+
+        self._check_plan(plan, page_count)
+
+        job = self.jobs.start(
+            user=user,
+            operation=OperationType.ORGANISE,
+            document_id=document.id,
+            options={
+                "pages": [
+                    {"number": planned.number, "rotation": planned.rotation} for planned in plan
+                ],
+                "source_page_count": page_count,
+            },
+        )
+        try:
+            output = operations.apply_page_plan(source, plan)
+            stored = self._store(
+                user,
+                output,
+                filename=output_name or output.filename,
+                mime_type=PDF,
+            )
+        except Exception as exc:
+            self.jobs.fail_from(job, exc)
+            raise
+
+        self.jobs.complete(job, output_key=stored.storage_path)
+        return ToolResult(job=job, output=stored)
+
+    def _check_plan(self, plan: Sequence[PlannedPage], page_count: int) -> None:
+        """Refuse a plan the document cannot satisfy.
+
+        Checked before a job is started: a request that names page 40 of a
+        20-page document never began processing, so recording it as a failed
+        job would put noise in the user's history.
+        """
+        if not plan:
+            raise ProcessingError("Keep at least one page.")
+
+        # A page may legitimately appear twice - duplicating a page is a real
+        # thing to want - so the cap is on the size of the result.
+        if len(plan) > self.settings.max_organise_pages:
+            raise ProcessingError(
+                f"That would produce {len(plan)} pages, and the limit is "
+                f"{self.settings.max_organise_pages}."
+            )
+
+        for planned in plan:
+            if planned.number < 1 or planned.number > page_count:
+                raise ProcessingError(
+                    f"There is no page {planned.number}: the document has {page_count} "
+                    f"{'page' if page_count == 1 else 'pages'}."
+                )
+            if planned.rotation % 90 != 0:
+                raise ProcessingError("Pages can only be turned in quarter turns.")
 
     # --- Shared ---------------------------------------------------------
 

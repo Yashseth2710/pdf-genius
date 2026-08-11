@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, FileArchive, FileImage, FileText, Loader2, Trash2 } from 'lucide-react'
+import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
@@ -156,13 +157,21 @@ function DocumentRow({
   }
 
   return (
-    <li className="hover:bg-muted/40 flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors">
+    <li className="hover:bg-muted/40 relative flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors">
       <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
         <Icon className="size-4" aria-hidden />
       </span>
 
       <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-medium">{document.original_filename}</p>
+        {/* The name is the way in to the document, which is where people
+            instinctively click. The link covers the whole row so the target is
+            not a few pixels of text. */}
+        <Link
+          href={`/dashboard/documents/${document.id}`}
+          className="focus-visible:ring-ring block truncate text-sm font-medium after:absolute after:inset-0 focus-visible:ring-2 focus-visible:outline-none"
+        >
+          {document.original_filename}
+        </Link>
         <p className="text-muted-foreground text-xs">
           {formatBytes(document.file_size)}
           {pages ? ` · ${pages}` : ''}
@@ -177,6 +186,7 @@ function DocumentRow({
             <Button
               variant="ghost"
               size="icon-sm"
+              className="relative"
               onClick={handleDownload}
               disabled={isDownloading}
             />
@@ -200,7 +210,7 @@ function DocumentRow({
               size="icon-sm"
               onClick={onDelete}
               disabled={isDeleting}
-              className="text-muted-foreground hover:text-destructive"
+              className="text-muted-foreground hover:text-destructive relative"
             />
           }
           aria-label={`Delete ${document.original_filename}`}

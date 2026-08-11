@@ -158,7 +158,7 @@ each one delivers and when it counts as finished.
 - [x] **3** — Authentication
 - [x] **4** — File infrastructure: upload, validation, storage, download, delete
 - [x] **5** — Merge and split
-- [ ] **6** — Page organisation: rotate, delete, reorder, extract
+- [x] **6** — Page organisation: rotate, delete, reorder, extract, plus preview
 - [ ] **7** — Compression and image conversion
 - [ ] **8** — Text watermark
 - [ ] **9** — Dashboard and history

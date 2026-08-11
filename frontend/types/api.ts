@@ -91,6 +91,20 @@ export interface ToolRun {
   output: DocumentSummary
 }
 
+/** One page kept by the organiser, and how far to turn it. */
+export interface PlannedPage {
+  /** 1-based, as printed on the page of the original document. */
+  number: number
+  /** Clockwise degrees on top of however the page already sits. */
+  rotation: 0 | 90 | 180 | 270
+}
+
+export interface OrganiseInput {
+  document_id: string
+  pages: PlannedPage[]
+  output_name?: string
+}
+
 export interface MergeInput {
   document_ids: string[]
   output_name?: string

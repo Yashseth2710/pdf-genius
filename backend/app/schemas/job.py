@@ -56,6 +56,28 @@ class MergeRequest(BaseModel):
     output_name: str = Field(default="merged.pdf", min_length=1, max_length=200)
 
 
+class PlannedPageRequest(BaseModel):
+    """One page the user is keeping, and how far to turn it."""
+
+    number: int = Field(ge=1, le=10_000)
+    # Clockwise degrees on top of however the page already sits, so 0 leaves it
+    # alone. Only quarter turns: anything else is a design tool's job.
+    rotation: Literal[0, 90, 180, 270] = 0
+
+
+class OrganiseRequest(BaseModel):
+    """The pages to keep, in the order to keep them.
+
+    One request covers rotating, reordering and deleting, because that is how
+    the user does it — a page dropped is a page missing from this list, and the
+    order of the list is the order of the result.
+    """
+
+    document_id: uuid.UUID
+    pages: list[PlannedPageRequest] = Field(min_length=1, max_length=500)
+    output_name: str | None = Field(default=None, max_length=200)
+
+
 class SplitRequest(BaseModel):
     """Split one PDF, in one of three ways.
 
