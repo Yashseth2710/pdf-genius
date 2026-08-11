@@ -1,10 +1,6 @@
 'use client'
 
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-
-import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { BackLink } from '@/components/shared/back-link'
 
 /**
  * The layout every tool page uses (spec section 37): a title that says what
@@ -25,13 +21,7 @@ export function ToolShell({
   return (
     <div className="space-y-8">
       <div>
-        <Link
-          href="/dashboard/tools"
-          className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }), 'mb-3 -ml-2')}
-        >
-          <ArrowLeft aria-hidden />
-          All tools
-        </Link>
+        <BackLink href="/dashboard/tools">All tools</BackLink>
         <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
         <p className="text-muted-foreground mt-1">{description}</p>
       </div>

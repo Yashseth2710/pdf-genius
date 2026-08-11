@@ -61,6 +61,21 @@ test('the tools page is reachable from the header', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Merge PDFs/ })).toBeVisible()
 })
 
+test('there is a way back from a tool to the documents', async ({ page }) => {
+  // The header logo goes home too, but a logo is not where people look for
+  // the way out of a screen they have gone into.
+  await signUp(page)
+
+  await page.goto('/dashboard/tools/merge')
+  await page.getByRole('link', { name: 'All tools' }).click()
+  await expect(page.getByRole('heading', { name: 'Tools' })).toBeVisible()
+
+  await page.getByRole('link', { name: 'Your documents' }).click()
+
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByLabel('Choose files to upload')).toBeAttached()
+})
+
 test('a tool tells you there is nothing to work on before anything is uploaded', async ({
   page,
 }) => {
