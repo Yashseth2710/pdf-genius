@@ -1,0 +1,12 @@
+# PDF Genius - backend development & test dependencies
+-r requirements.txt
+
+# --- Testing ---
+pytest
+pytest-asyncio
+pytest-cov
+httpx
+
+# --- Lint & type check (used by CI) ---
+ruff
+mypy

@@ -1,0 +1,33 @@
+# PDF Genius - backend runtime dependencies (Python 3.12)
+# Exact versions are pinned in requirements.lock.txt
+
+# --- Web framework ---
+fastapi
+uvicorn[standard]
+python-multipart
+
+# --- Config & validation ---
+pydantic
+pydantic-settings
+email-validator
+
+# --- Database ---
+SQLAlchemy
+alembic
+psycopg[binary]
+
+# --- Auth & security ---
+PyJWT
+argon2-cffi
+
+# --- PDF & image processing ---
+PyMuPDF
+pypdf
+pdfplumber
+pillow
+
+# --- Rate limiting (in-memory, no Redis) ---
+slowapi
+
+# --- HTTP client (AI providers, health checks) ---
+httpx

@@ -1,0 +1,46 @@
+# --- Dependencies ---
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# --- Build output ---
+.next/
+out/
+build/
+dist/
+*.egg-info/
+
+# --- Environment / secrets ---
+.env
+.env.*
+!.env.example
+
+# --- Testing ---
+coverage/
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+test-results/
+playwright-report/
+blob-report/
+
+# --- Runtime storage (uploaded / processed / temp files) ---
+storage/
+uploads/
+tmp/
+
+# --- Editor / OS ---
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- Next.js / Vercel ---
+.vercel
+next-env.d.ts
+*.tsbuildinfo
