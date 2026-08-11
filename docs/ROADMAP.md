@@ -18,8 +18,8 @@ A scope is finished only when all of this is true (spec section 64):
 | 1  | Foundation                | M    | —          | ✅ Done |
 | 2  | Data model and migrations | S    | 1          | ✅ Done |
 | 3  | Authentication            | L    | 2          | ✅ Done |
-| 4  | File infrastructure       | L    | 3          | Next   |
-| 5  | Merge and split           | M    | 4          |        |
+| 4  | File infrastructure       | L    | 3          | ✅ Done |
+| 5  | Merge and split           | M    | 4          | Next   |
 | 6  | Page organisation         | L    | 5          |        |
 | 7  | Compression and conversion| M    | 4          |        |
 | 8  | Watermark                 | S    | 4          |        |
@@ -80,22 +80,29 @@ currently lives in `localStorage` and what replaces that in scope 11.
 
 ---
 
-## 4. File infrastructure
+## 4. File infrastructure ✅
 
-Every PDF tool depends on this, and it is where the security work concentrates
+Every PDF tool depends on this, and it is where the security work concentrated
 (sections 18, 19).
 
-**Backend:** upload with size and MIME validation (sniffed from content, never
-trusted from the filename), internally generated storage names, path-traversal
-protection, page counting, metadata persisted to `documents`, list/get/delete,
-download streaming, temp-file cleanup.
+**Shipped — backend:** upload, list, fetch, download and delete. File type is
+decided by reading the file's leading bytes, never from the filename or the
+`Content-Type` header. PDFs are then opened to prove there is a document behind
+the header. Storage keys are generated, validated, and resolved against the
+storage root. Uploads stream to disk in chunks and abort at the size limit.
 
-**Frontend:** drag-and-drop upload zone with progress, file cards, removal,
-validation messages, PDF preview via PDF.js.
+**Shipped — frontend:** drag-and-drop upload with real progress (via
+XMLHttpRequest, since fetch cannot report upload progress), per-file error
+rows, paginated document list, download and delete, with loading, error and
+empty states.
 
-**Tests:** oversized files rejected, a `.exe` renamed to `.pdf` rejected,
-corrupted PDFs rejected, `../../etc/passwd` as a filename rejected, and user A
-receiving 404 rather than 403 when reaching for user B's document.
+**Shipped — tests:** 55 backend tests weighted towards what must not happen,
+plus 5 end-to-end covering upload, reload, delete and one account being unable
+to see another's documents.
+
+**Not included:** PDF preview via PDF.js. It belongs with the thumbnail grid in
+scope 6, where the same rendering work is needed for page selection, rather
+than being built twice.
 
 ---
 

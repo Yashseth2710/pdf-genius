@@ -79,9 +79,44 @@ showing a shell that cannot load. The API is the actual gate, and it re-checks
 every request. Next's own documentation describes proxy-level checks as
 optimistic only, which is why none of the security depends on them.
 
+## Uploaded files
+
+Uploaded files are untrusted input, and are treated as such.
+
+**What a file is gets decided by reading it.** The filename and the browser's
+`Content-Type` header are both supplied by whoever is uploading, so neither is
+consulted. The leading bytes are matched against known signatures, and anything
+that is not a PDF, JPEG or PNG is refused — a `.exe` renamed to `invoice.pdf`
+gets nowhere. Passing that check only proves the header is right, so PDFs are
+then opened with PyMuPDF: a truncated or corrupt file is rejected and deleted
+rather than left on disk pretending to be a document.
+
+**Filenames never become paths.** Storage keys are generated
+(`documents/<user id>/<uuid>.pdf`), because the moment an attacker-controlled
+string becomes a path it can contain `..`. Three layers back that up: keys are
+validated against a strict pattern, the resolved path is checked to be inside
+the storage root (a well-formed key can still point elsewhere through a
+symlink), and the API never accepts a key from a client at all — downloads take
+a document id.
+
+The original filename is kept for display and cleaned before it goes into a
+`Content-Disposition` header, so `../../etc/passwd.pdf` is offered as
+`passwd.pdf`.
+
+**Size is capped while writing, not after.** Uploads stream to disk in 64KB
+chunks and abort the moment they pass the limit, so a 25MB cap does not mean
+25MB of memory per upload, and a dishonest `Content-Length` buys nothing.
+Partial files are removed on every failure path.
+
+`storage_path` is absent from every API response: where a file physically lives
+is internal.
+
 ## Rate limiting
 
-In-memory counters (slowapi): 5/minute on registration, 10/minute on sign-in.
+In-memory counters (slowapi): 5/minute on registration, 10/minute on sign-in,
+30/minute on upload. These are settings (`RATE_LIMIT_*`), not hard-coded
+values — an automated test run legitimately registers many accounts from one
+address, and so does an office behind a single NAT address.
 
 No Redis. A single backend process needs no shared store, and adding one purely
 to count requests would break the free-first constraint. **If the backend is
@@ -115,8 +150,10 @@ credentials.
 Tracked for scope 11 (hardening):
 
 - Move the token to an httpOnly cookie
-- Security headers (CSP, HSTS, X-Content-Type-Options)
-- The upload rules in spec section 19 — MIME sniffing, path-traversal
-  rejection, size limits — which arrive with scope 4
+- Security headers (CSP, HSTS) — `X-Content-Type-Options` is already set on
+  downloads
 - Dependency audit in CI
 - Account lockout after repeated failures, beyond rate limiting
+- A storage quota per account; nothing currently caps total usage
+- Antivirus scanning of uploads, if it can be done within the free-first
+  constraint
