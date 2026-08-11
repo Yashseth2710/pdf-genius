@@ -58,7 +58,7 @@ export function PageThumbnail({
     if (!document || !isVisible) return
 
     let cancelled = false
-    void renderPage(document, pageNumber, THUMBNAIL_WIDTH)
+    void renderPage(document, pageNumber, { maxWidth: THUMBNAIL_WIDTH })
       .then((canvas) => {
         // The user may have scrolled on, or the document may have been swapped.
         if (cancelled || !holder.current) return

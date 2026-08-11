@@ -145,6 +145,11 @@ bytes already downloaded through the authenticated endpoint, so viewing a
 document costs the server nothing beyond the download it would have served
 anyway, and no page images are generated or stored anywhere.
 
+Preview buttons appear beside every document in every tool, but each one
+fetches only when it is pressed. Loading eagerly would mean a picker showing
+twenty PDFs quietly downloading all twenty — the user's bandwidth and the
+server's, spent on files nobody asked to see.
+
 ## Rate limiting
 
 In-memory counters (slowapi): 5/minute on registration, 10/minute on sign-in,

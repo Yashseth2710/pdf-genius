@@ -64,8 +64,23 @@ export async function loadDocument(documentId: string): Promise<OpenPdf> {
   return { document: await task.promise, close: () => task.destroy() }
 }
 
+export interface RenderFit {
+  maxWidth: number
+  /**
+   * When given, the page is scaled to fit inside both dimensions.
+   *
+   * This is what makes a reader feel normal: fitting width alone on a wide
+   * monitor draws an A4 page more than a metre tall and leaves the reader
+   * scrolling through one page. Fitting the box shows the whole page, which is
+   * what every PDF viewer does by default.
+   */
+  maxHeight?: number
+  /** Multiplies the fitted scale, for zooming in past "whole page". */
+  zoom?: number
+}
+
 /**
- * Draw one page onto a canvas, scaled to fit a box of ``maxWidth``.
+ * Draw one page onto a canvas, scaled to fit the given box.
  *
  * Returns the canvas rather than a data URL: a data URL for every page of a
  * 200-page document is a great deal of string to keep in memory, and the
@@ -74,11 +89,16 @@ export async function loadDocument(documentId: string): Promise<OpenPdf> {
 export async function renderPage(
   document: PDFDocumentProxy,
   pageNumber: number,
-  maxWidth: number,
+  fit: RenderFit,
 ): Promise<HTMLCanvasElement> {
   const page = await document.getPage(pageNumber)
   const unscaled = page.getViewport({ scale: 1 })
-  const viewport = page.getViewport({ scale: maxWidth / unscaled.width })
+
+  const byWidth = fit.maxWidth / unscaled.width
+  const scale =
+    (fit.maxHeight ? Math.min(byWidth, fit.maxHeight / unscaled.height) : byWidth) * (fit.zoom ?? 1)
+
+  const viewport = page.getViewport({ scale })
 
   const canvas = window.document.createElement('canvas')
   const context = canvas.getContext('2d')

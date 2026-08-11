@@ -20,6 +20,7 @@ import type { PDFDocumentProxy } from 'pdfjs-dist'
 import { ChevronLeft, ChevronRight, RotateCcw, RotateCw, Trash2, Undo2 } from 'lucide-react'
 
 import { PageThumbnail } from '@/components/tools/page-thumbnail'
+import { PreviewButton } from '@/components/tools/preview-button'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { PlanEntry } from '@/lib/page-plan'
@@ -35,12 +36,16 @@ import { cn } from '@/lib/utils'
  */
 export function PageGrid({
   document,
+  documentId,
+  filename,
   plan,
   onMove,
   onRotate,
   onToggleRemoved,
 }: {
   document: PDFDocumentProxy | null
+  documentId: string
+  filename: string
   plan: PlanEntry[]
   onMove: (key: string, to: number) => void
   onRotate: (key: string, degrees: number) => void
@@ -70,6 +75,8 @@ export function PageGrid({
             <PageCard
               key={entry.key}
               document={document}
+              documentId={documentId}
+              filename={filename}
               entry={entry}
               position={index + 1}
               total={plan.length}
@@ -87,6 +94,8 @@ export function PageGrid({
 
 function PageCard({
   document,
+  documentId,
+  filename,
   entry,
   position,
   total,
@@ -96,6 +105,8 @@ function PageCard({
   onToggleRemoved,
 }: {
   document: PDFDocumentProxy | null
+  documentId: string
+  filename: string
   entry: PlanEntry
   position: number
   total: number
@@ -158,6 +169,15 @@ function PageCard({
         </span>
 
         <div className="flex items-center">
+          {/* Being able to look at a page properly before deciding to drop it
+              is the difference between organising and guessing. */}
+          <PreviewButton
+            documentId={documentId}
+            filename={filename}
+            startPage={entry.number}
+            label={`Preview ${label}`}
+          />
+
           {entry.removed ? (
             <Tooltip>
               <TooltipTrigger

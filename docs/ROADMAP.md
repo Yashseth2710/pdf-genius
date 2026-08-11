@@ -156,12 +156,21 @@ Removed pages stay visible and greyed rather than vanishing, so they can be put
 back and the pages around them do not renumber under the cursor. Turning is CSS
 on the canvas, so it is instant — the document is only rewritten on save.
 
-**Also shipped: preview.** Clicking a document opens it page by page, using the
-same renderer — it was deferred from scope 4 precisely so it could share this
-code rather than be built twice. Clicking a page opens it **full screen**,
-drawn at the width of the window rather than at thumbnail size, with next and
-previous, arrow keys and Escape. Thumbnails are for finding a page; that is for
-reading it.
+**Also shipped: preview, everywhere.** Clicking a document opens it page by
+page, using the same renderer — it was deferred from scope 4 precisely so it
+could share this code rather than be built twice. Clicking a page opens it full
+screen with next/previous, arrow keys, Escape and zoom.
+
+The page is scaled so the **whole page fits**, the way a PDF reader opens.
+Fitting the width instead — which is how it shipped first — draws an A4 page
+over a metre tall on a wide monitor and leaves you scrolling through a single
+page.
+
+A preview button then went everywhere a document is chosen or produced: both
+pickers, every card in the organiser, the document list, and the result panel
+of every tool. Being able to check the output before downloading it is the
+point of having a preview at all. Each one loads its document only when
+pressed, so a list of twenty PDFs does not fetch twenty PDFs.
 
 **Shipped — tests:** 23 for the plan module (pure state, no canvas), 14 for the
 organiser, 11 end to end including one that asserts a real `<canvas>` per page
