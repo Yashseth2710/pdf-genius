@@ -156,7 +156,7 @@ each one delivers and when it counts as finished.
 
 - [x] **1** — Foundation: structure, configuration, database, error handling, health checks, CI
 - [x] **2** — Data model and migrations
-- [ ] **3** — Authentication
+- [x] **3** — Authentication
 - [ ] **4** — File infrastructure: upload, validation, storage, download, delete
 - [ ] **5** — Merge and split
 - [ ] **6** — Page organisation: rotate, delete, reorder, extract

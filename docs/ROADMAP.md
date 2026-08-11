@@ -17,8 +17,8 @@ A scope is finished only when all of this is true (spec section 64):
 | -- | ------------------------- | ---- | ---------- | ------ |
 | 1  | Foundation                | M    | —          | ✅ Done |
 | 2  | Data model and migrations | S    | 1          | ✅ Done |
-| 3  | Authentication            | L    | 2          | Next   |
-| 4  | File infrastructure       | L    | 3          |        |
+| 3  | Authentication            | L    | 2          | ✅ Done |
+| 4  | File infrastructure       | L    | 3          | Next   |
 | 5  | Merge and split           | M    | 4          |        |
 | 6  | Page organisation         | L    | 5          |        |
 | 7  | Compression and conversion| M    | 4          |        |
@@ -59,24 +59,24 @@ See [DATABASE.md](DATABASE.md).
 
 ---
 
-## 3. Authentication
+## 3. Authentication ✅
 
-The gate everything else sits behind, so it is worth doing carefully.
+The gate everything else sits behind.
 
-**Backend:** register, login, `/auth/me`, logout; Argon2 hashing; JWT issuing
-and verification; a `current_user` dependency; rate limiting on the auth
-endpoints.
+**Shipped — backend:** register, login, `/auth/me`, logout; Argon2id hashing
+with automatic rehash on sign-in; JWTs with a pinned algorithm; a
+`current_user` dependency; rate limiting (5/min register, 10/min login).
 
-**Frontend:** landing page (section 38), app shell with header and navigation,
-register and login forms with React Hook Form + Zod, session handling, route
-protection, logout.
+**Shipped — frontend:** landing page, app shell, register and login forms
+(React Hook Form + Zod mirroring the backend rules), session restore on load,
+client-side route protection, account menu, and light/dark/system theming.
 
-**Tests:** password hashing and verification, token expiry and tampering,
-protected routes rejecting missing/invalid/expired tokens, end-to-end
-register → log in → land on dashboard → log out.
+**Shipped — tests:** 73 backend, 21 frontend, 6 end-to-end including the full
+register → dashboard → sign out → sign back in journey against a real API and
+database.
 
-**Watch out for:** identical responses whether or not an email exists, so the
-endpoint cannot be used to enumerate accounts.
+See [SECURITY.md](SECURITY.md) for the decisions, including why the token
+currently lives in `localStorage` and what replaces that in scope 11.
 
 ---
 
