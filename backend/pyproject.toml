@@ -41,4 +41,8 @@ ignore_missing_imports = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q --strict-markers"
+# Put backend/ on sys.path so "import app" works whether the suite is started
+# as `pytest` or as `python -m pytest` (only the latter adds the working
+# directory automatically).
+pythonpath = ["."]
 filterwarnings = ["error::DeprecationWarning:app.*"]
