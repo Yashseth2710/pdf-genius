@@ -12,6 +12,7 @@ from app import __version__
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
+from app.core.rate_limit import register_rate_limiting
 
 API_PREFIX = "/api/v1"
 
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
         expose_headers=["X-Request-ID", "Content-Disposition"],
     )
 
+    register_rate_limiting(app)
     register_request_logging(app)
     register_exception_handlers(app)
     app.include_router(api_router, prefix=API_PREFIX)

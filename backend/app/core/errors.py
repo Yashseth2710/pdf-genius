@@ -51,6 +51,14 @@ class PermissionDeniedError(AppError):
     message = "You do not have access to this resource."
 
 
+class ConflictError(AppError):
+    """The request clashes with something that already exists."""
+
+    status_code = status.HTTP_409_CONFLICT
+    code = "CONFLICT"
+    message = "That already exists."
+
+
 class InvalidFileError(AppError):
     status_code = status.HTTP_422_UNPROCESSABLE_CONTENT
     code = "INVALID_FILE"
