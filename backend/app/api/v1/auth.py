@@ -37,7 +37,7 @@ def _auth_response(user: User) -> AuthResponse:
 )
 # Registration is rate limited so the endpoint cannot be used to create
 # accounts in bulk or to probe which addresses are taken.
-@limiter.limit("5/minute")
+@limiter.limit(settings.rate_limit_register)
 def register(
     request: Request,
     payload: RegisterRequest,
@@ -53,7 +53,7 @@ def register(
     summary="Sign in and receive an access token",
 )
 # Tighter than registration: this is the endpoint worth guessing at.
-@limiter.limit("10/minute")
+@limiter.limit(settings.rate_limit_login)
 def login(
     request: Request,
     payload: LoginRequest,

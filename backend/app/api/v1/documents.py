@@ -28,7 +28,7 @@ settings = get_settings()
     status_code=status.HTTP_201_CREATED,
     summary="Upload a document",
 )
-@limiter.limit("30/minute")
+@limiter.limit(settings.rate_limit_upload)
 def upload_document(
     request: Request,
     current_user: CurrentUser,

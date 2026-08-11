@@ -49,7 +49,10 @@ jobs:
           cache-dependency-path: backend/requirements*.txt
 
       - name: Install dependencies
-        run: pip install -r requirements-dev.txt
+        # The lock file, not requirements-dev.txt: unpinned installs meant CI
+        # could resolve a different linter than the one run locally, and did -
+        # a newer ruff sorted imports differently and failed a green branch.
+        run: pip install -r requirements.lock.txt
 
       - name: Lint
         run: ruff check .
@@ -128,6 +131,11 @@ jobs:
       JWT_SECRET: ci-only-secret-not-used-anywhere-else
       CORS_ORIGINS: http://localhost:3000
       NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      # The suite registers an account per test from one address, which the
+      # production limits would (correctly) block.
+      RATE_LIMIT_REGISTER: 1000/minute
+      RATE_LIMIT_LOGIN: 1000/minute
+      RATE_LIMIT_UPLOAD: 1000/minute
 
     steps:
       - uses: actions/checkout@v5
@@ -146,7 +154,7 @@ jobs:
 
       - name: Install backend dependencies
         working-directory: backend
-        run: pip install -r requirements.txt
+        run: pip install -r requirements.lock.txt
 
       - name: Apply migrations
         working-directory: backend

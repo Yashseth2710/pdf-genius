@@ -37,6 +37,14 @@ class Settings(BaseSettings):
     # --- CORS ---
     cors_origins: str = "http://localhost:3000"
 
+    # --- Rate limits ---
+    # Configurable rather than hard-coded: the defaults suit real users, but a
+    # test run legitimately registers a dozen accounts in a few seconds, and an
+    # office behind one NAT address is not an attacker either.
+    rate_limit_register: str = "5/minute"
+    rate_limit_login: str = "10/minute"
+    rate_limit_upload: str = "30/minute"
+
     # --- Storage ---
     storage_provider: str = "local"
     storage_root: Path = Path("./storage")

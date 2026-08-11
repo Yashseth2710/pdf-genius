@@ -1,15 +1,14 @@
 'use client'
 
-import { FileText } from 'lucide-react'
+import { useQueryClient } from '@tanstack/react-query'
 
+import { DocumentList } from '@/components/documents/document-list'
+import { UploadZone } from '@/components/upload/upload-zone'
 import { useAuth } from '@/hooks/use-auth'
 
-/**
- * A placeholder home for signed-in users. The quick tools, recent documents
- * and activity feed arrive in scope 9, once there are documents to show.
- */
 export default function DashboardPage() {
   const { user } = useAuth()
+  const queryClient = useQueryClient()
 
   return (
     <div className="space-y-8">
@@ -17,20 +16,22 @@ export default function DashboardPage() {
         <h1 className="text-2xl font-semibold tracking-tight">
           Welcome{user ? `, ${user.first_name}` : ''}
         </h1>
-        <p className="text-muted-foreground mt-1">Here is where your documents will live.</p>
-      </div>
-
-      {/* Empty state - a signed-in account with nothing in it yet. */}
-      <div className="flex flex-col items-center justify-center rounded-xl border border-dashed px-6 py-16 text-center">
-        <span className="bg-muted mb-4 flex size-12 items-center justify-center rounded-full">
-          <FileText className="text-muted-foreground size-6" aria-hidden />
-        </span>
-        <h2 className="font-medium">No documents yet</h2>
-        <p className="text-muted-foreground mt-1.5 max-w-sm text-sm text-pretty">
-          Uploading, merging, splitting and the rest of the tools are on the way. Your account is
-          ready and waiting for them.
+        <p className="text-muted-foreground mt-1">
+          Upload a document to get started. The tools arrive next.
         </p>
       </div>
+
+      <UploadZone
+        // Refetch rather than pushing into the cache by hand: the list is
+        // paginated and sorted by the server, so it decides where a new
+        // document belongs.
+        onUploaded={() => void queryClient.invalidateQueries({ queryKey: ['documents'] })}
+      />
+
+      <section className="space-y-3">
+        <h2 className="text-lg font-medium tracking-tight">Your documents</h2>
+        <DocumentList />
+      </section>
     </div>
   )
 }

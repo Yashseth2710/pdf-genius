@@ -47,6 +47,26 @@ export interface AuthPayload {
   user: User
 }
 
+export type DocumentStatus = 'UPLOADED' | 'READY' | 'FAILED'
+
+/** A stored document. Note there is no storage path - that stays internal. */
+export interface DocumentSummary {
+  id: string
+  original_filename: string
+  mime_type: string
+  file_size: number
+  page_count: number | null
+  status: DocumentStatus
+  created_at: string
+}
+
+export interface DocumentListPage {
+  items: DocumentSummary[]
+  total: number
+  limit: number
+  offset: number
+}
+
 export interface RegisterInput {
   email: string
   password: string
