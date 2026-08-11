@@ -131,6 +131,55 @@ drop it again. See [DATABASE.md](DATABASE.md).
 | `npm run typecheck` | Generate route types, then `tsc`    |
 | `npm run format`    | Prettier                            |
 
+## What to run before pushing, and what to leave to CI
+
+Four checks, about twelve seconds, and no picking and choosing which tests are
+"relevant" — the whole point of a suite is to catch what nobody predicted would
+break:
+
+```bash
+cd backend  && pytest && ruff check . && mypy app tests   # ~3s
+cd frontend && npm run test && npm run lint && npm run typecheck  # ~9s
+```
+
+Two suites are deliberately **not** run locally:
+
+- **Backend integration tests.** Most of their two minutes is fixed cost —
+  Alembic building and dropping the schema over the network — and CI runs them
+  against a throwaway `postgres:18` container that is faster and cleaner than
+  anything here.
+- **The full Playwright suite.** It cannot run properly on a dev machine: the
+  backend caps registration at 5/minute, which the suite legitimately exceeds,
+  and `next dev` refuses to start twice from one directory. CI raises the
+  limits and runs against a real production build.
+
+While building, narrow the run instead: `pytest -k merge`, `vitest -t "order"`,
+`playwright test -g "can be merged"`. That is for iteration, not for the final
+check before a push.
+
+## Branching
+
+`main` is protected. All three CI jobs must pass before anything lands, and
+that applies to administrators too, so **nothing is pushed straight to `main` —
+including hotfixes**.
+
+```bash
+git switch -c scope-6-page-organisation
+# ... work, commit ...
+git push -u origin scope-6-page-organisation
+gh pr create --fill
+gh pr merge --squash    # once CI is green
+```
+
+Reviews are not required — this is a one-person project and waiting for an
+approval that can only come from yourself is theatre. CI is the gate.
+
+To relax the admin rule temporarily:
+
+```bash
+gh api -X DELETE repos/Yashseth2710/pdf-genius/branches/main/protection/enforce_admins
+```
+
 ## Conventions
 
 - **Commits** follow `feat:`, `fix:`, `chore:`, `test:`, `refactor:`, `docs:`
