@@ -72,12 +72,13 @@ export type JobStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 export type OperationType =
   'MERGE' | 'SPLIT' | 'COMPRESS' | 'CONVERT' | 'ROTATE' | 'EXTRACT' | 'WATERMARK' | 'OCR'
 
-/** A record of one operation. Never includes where the output is stored. */
+/** A record of one operation. Results are named by document id. */
 export interface Job {
   id: string
   operation: OperationType
   status: JobStatus
   document_id: string | null
+  output_document_ids: string[]
   options: Record<string, unknown>
   /** Written for the user, never a stack trace. */
   error_message: string | null
@@ -85,10 +86,15 @@ export interface Job {
   completed_at: string | null
 }
 
-/** What a finished tool run returns: the job, and the document it produced. */
+/**
+ * What a finished tool run returns: the job, and the documents it produced.
+ *
+ * Always a list. A split into twelve pages produces twelve documents, and a
+ * shape that changed with the count would only move the branching outwards.
+ */
 export interface ToolRun {
   job: Job
-  output: DocumentSummary
+  outputs: DocumentSummary[]
 }
 
 /** One page kept by the organiser, and how far to turn it. */

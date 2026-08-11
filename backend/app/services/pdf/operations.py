@@ -9,10 +9,8 @@ count limits from settings before anything reaches these functions.
 """
 
 import logging
-import zipfile
 from collections.abc import Sequence
 from dataclasses import dataclass
-from io import BytesIO
 
 import pymupdf
 
@@ -201,29 +199,6 @@ def apply_page_plan(source: SourcePdf, plan: Sequence[PlannedPage]) -> OutputFil
             rebuilt.close()
 
     return OutputFile(filename=f"{stem}-organised.pdf", data=data, page_count=page_count)
-
-
-def to_zip(outputs: Sequence[OutputFile], filename: str) -> OutputFile:
-    """Bundle several outputs into one archive.
-
-    Deflate rather than store: the parts are PDFs, which are already compressed
-    internally, but the gain is real on text-heavy pages and costs little.
-    """
-    buffer = BytesIO()
-    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
-        for output in outputs:
-            # Names inside the archive are ours, but they descend from the
-            # user's filename, so they are cleaned the same way a download
-            # header would be.
-            archive.writestr(safe_download_name(output.filename), output.data)
-
-    return OutputFile(
-        filename=filename,
-        data=buffer.getvalue(),
-        # A zip has no pages of its own, and claiming the total would be a lie
-        # about a single document.
-        page_count=0,
-    )
 
 
 def stem_of(filename: str) -> str:

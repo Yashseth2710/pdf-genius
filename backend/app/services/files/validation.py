@@ -36,6 +36,11 @@ _SIGNATURES: list[tuple[bytes, FileType]] = [
 ]
 
 
+# The file extension we give a result of each type. Uploads take theirs from
+# the signature table above; results are ours to name.
+EXTENSIONS: dict[str, str] = {PDF: "pdf", JPEG: "jpg", PNG: "png", ZIP: "zip"}
+
+
 def sniff(head: bytes) -> FileType | None:
     """Identify a file from its leading bytes, or None if we do not know it."""
     for signature, file_type in _SIGNATURES:

@@ -1,13 +1,14 @@
 'use client'
 
-import { CheckCircle2, Download, FileArchive, FileText, Loader2 } from 'lucide-react'
+import { Archive, CheckCircle2, Download, FileText, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { PreviewButton } from '@/components/tools/preview-button'
 import { Button, buttonVariants } from '@/components/ui/button'
-import { downloadDocument } from '@/lib/documents'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { downloadArchive, downloadDocument } from '@/lib/documents'
 import { formatBytes, formatPages } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import type { DocumentSummary } from '@/types/api'
@@ -15,23 +16,38 @@ import type { DocumentSummary } from '@/types/api'
 /**
  * What a finished tool run shows.
  *
- * The result is a document like any other, so this offers the download people
- * came for and a way back to the list, rather than a dead-end "success".
+ * Every result is a document like any other — several of them, for a split —
+ * so each one gets a preview and a download of its own rather than being
+ * bundled into an archive the user then has to unpack. "Download all" zips
+ * them on the way out for anyone who does want one file.
  */
-export function ToolResult({ output, onReset }: { output: DocumentSummary; onReset: () => void }) {
-  const [isDownloading, setIsDownloading] = useState(false)
-  const isArchive = output.mime_type === 'application/zip'
-  const Icon = isArchive ? FileArchive : FileText
-  const pages = formatPages(output.page_count)
+export function ToolResult({
+  outputs,
+  onReset,
+  archiveName,
+}: {
+  outputs: DocumentSummary[]
+  onReset: () => void
+  /** Name for the bundle when several results are downloaded together. */
+  archiveName?: string
+}) {
+  const [isArchiving, setIsArchiving] = useState(false)
 
-  async function handleDownload() {
-    setIsDownloading(true)
+  if (outputs.length === 0) return null
+
+  const many = outputs.length > 1
+
+  async function handleDownloadAll() {
+    setIsArchiving(true)
     try {
-      await downloadDocument(output.id, output.original_filename)
+      await downloadArchive(
+        outputs.map((output) => output.id),
+        archiveName ?? 'documents.zip',
+      )
     } catch {
-      toast.error('That file could not be downloaded.')
+      toast.error('Those files could not be downloaded.')
     } finally {
-      setIsDownloading(false)
+      setIsArchiving(false)
     }
   }
 
@@ -47,41 +63,26 @@ export function ToolResult({ output, onReset }: { output: DocumentSummary; onRes
     >
       <div className="flex items-center gap-2 text-green-700 dark:text-green-500">
         <CheckCircle2 className="size-5" aria-hidden />
-        <p className="font-medium">Done</p>
+        <p className="font-medium">{many ? `Done — ${outputs.length} files` : 'Done'}</p>
       </div>
 
-      <div className="bg-background flex items-center gap-3 rounded-lg border px-3 py-2.5">
-        <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
-          <Icon className="size-4" aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{output.original_filename}</p>
-          <p className="text-muted-foreground text-xs">
-            {formatBytes(output.file_size)}
-            {pages ? ` · ${pages}` : ''}
-            {isArchive ? ' · ZIP archive' : ''}
-          </p>
-        </div>
-      </div>
+      <ul className="space-y-2">
+        {outputs.map((output) => (
+          <ResultRow key={output.id} output={output} />
+        ))}
+      </ul>
 
       <div className="flex flex-wrap gap-2">
-        {/* Checking the result is right before downloading it is the whole
-            point of having a preview at all. Archives have nothing to draw. */}
-        {!isArchive && (
-          <PreviewButton
-            documentId={output.id}
-            filename={output.original_filename}
-            appearance="button"
-          />
+        {many && (
+          <Button onClick={handleDownloadAll} disabled={isArchiving}>
+            {isArchiving ? (
+              <Loader2 className="animate-spin" aria-hidden />
+            ) : (
+              <Archive aria-hidden />
+            )}
+            {isArchiving ? 'Preparing…' : `Download all ${outputs.length}`}
+          </Button>
         )}
-        <Button onClick={handleDownload} disabled={isDownloading}>
-          {isDownloading ? (
-            <Loader2 className="animate-spin" aria-hidden />
-          ) : (
-            <Download aria-hidden />
-          )}
-          {isDownloading ? 'Downloading…' : 'Download'}
-        </Button>
         <Button variant="outline" onClick={onReset}>
           Start again
         </Button>
@@ -91,8 +92,64 @@ export function ToolResult({ output, onReset }: { output: DocumentSummary; onRes
       </div>
 
       <p className="text-muted-foreground text-xs">
-        This file has been saved to your documents, so you can come back for it later.
+        {many ? 'These files have' : 'This file has'} been saved to your documents, so you can come
+        back for {many ? 'them' : 'it'} later — or use {many ? 'them' : 'it'} in another tool.
       </p>
     </div>
+  )
+}
+
+function ResultRow({ output }: { output: DocumentSummary }) {
+  const [isDownloading, setIsDownloading] = useState(false)
+  const pages = formatPages(output.page_count)
+
+  async function handleDownload() {
+    setIsDownloading(true)
+    try {
+      await downloadDocument(output.id, output.original_filename)
+    } catch {
+      toast.error('That file could not be downloaded.')
+    } finally {
+      setIsDownloading(false)
+    }
+  }
+
+  return (
+    <li className="bg-background flex items-center gap-3 rounded-lg border px-3 py-2.5">
+      <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
+        <FileText className="size-4" aria-hidden />
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium">{output.original_filename}</p>
+        <p className="text-muted-foreground text-xs">
+          {formatBytes(output.file_size)}
+          {pages ? ` · ${pages}` : ''}
+        </p>
+      </div>
+
+      <PreviewButton documentId={output.id} filename={output.original_filename} />
+
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleDownload}
+              disabled={isDownloading}
+            />
+          }
+          aria-label={`Download ${output.original_filename}`}
+        >
+          {isDownloading ? (
+            <Loader2 className="animate-spin" aria-hidden />
+          ) : (
+            <Download aria-hidden />
+          )}
+        </TooltipTrigger>
+        <TooltipContent>{isDownloading ? 'Downloading…' : 'Download'}</TooltipContent>
+      </Tooltip>
+    </li>
   )
 }

@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Any
 
-from sqlalchemy import DateTime, Enum, ForeignKey, String, Text
+from sqlalchemy import DateTime, Enum, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -50,7 +50,17 @@ class ProcessingJob(UUIDPrimaryKey, Timestamps, Base):
     # text and so on. JSONB because every operation takes different settings,
     # and a column per option would be unworkable.
     input_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
-    output_path: Mapped[str | None] = mapped_column(String(512), nullable=True)
+
+    # The documents this job produced, in the order they came out.
+    #
+    # A list rather than the single output_path the specification sketched:
+    # splitting a document into twelve pages produces twelve results, and
+    # bundling them into one archive to fit a single column made the archive
+    # the thing the user received. An archive cannot be previewed, merged or
+    # organised - it is the only dead end in the app - so the outputs are kept
+    # as ordinary documents and zipped only if someone asks to download them
+    # all at once.
+    output_document_ids: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
     # The reason a job failed, phrased for the user. Never a stack trace.
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

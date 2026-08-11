@@ -68,7 +68,7 @@ beforeEach(() => {
   listDocuments.mockResolvedValue(page)
   mergeDocuments.mockResolvedValue({
     job: { id: 'job-1', operation: 'MERGE', status: 'COMPLETED' },
-    output: doc('out', 'merged.pdf'),
+    outputs: [doc('out', 'merged.pdf')],
   })
 })
 
@@ -144,7 +144,7 @@ describe('Merge page', () => {
 
     const result = await screen.findByRole('status', { name: 'Result' })
     expect(within(result).getByText('merged.pdf')).toBeInTheDocument()
-    expect(within(result).getByRole('button', { name: 'Download' })).toBeInTheDocument()
+    expect(within(result).getByRole('button', { name: 'Download merged.pdf' })).toBeInTheDocument()
   })
 
   it('shows the reason a merge failed', async () => {

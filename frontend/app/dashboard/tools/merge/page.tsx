@@ -150,7 +150,7 @@ export default function MergePage() {
         )}
       </div>
 
-      {merge.isSuccess && <ToolResult output={merge.data.output} onReset={reset} />}
+      {merge.isSuccess && <ToolResult outputs={merge.data.outputs} onReset={reset} />}
     </ToolShell>
   )
 }

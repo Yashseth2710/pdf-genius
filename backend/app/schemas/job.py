@@ -13,8 +13,8 @@ from app.schemas.document import DocumentResponse
 class JobResponse(BaseModel):
     """A job as the API describes it.
 
-    ``output_path`` is deliberately absent, for the same reason a document
-    never publishes its storage path: the result is reached by its document id.
+    Results are named by document id, never by storage path: where a file
+    physically lives stays internal, exactly as it does for a document.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -23,6 +23,7 @@ class JobResponse(BaseModel):
     operation: OperationType
     status: JobStatus
     document_id: uuid.UUID | None
+    output_document_ids: list[uuid.UUID]
     options: dict[str, Any] = Field(validation_alias="input_metadata")
     error_message: str | None
     created_at: datetime
@@ -37,10 +38,15 @@ class JobListResponse(BaseModel):
 
 
 class ToolRunResponse(BaseModel):
-    """What a finished tool run gives back: the job, and the file it produced."""
+    """What a finished tool run gives back: the job, and the files it produced.
+
+    Always a list, even for a merge that produces one file. A shape that
+    changed with the number of results would only move the branching into
+    every caller.
+    """
 
     job: JobResponse
-    output: DocumentResponse
+    outputs: list[DocumentResponse]
 
 
 class MergeRequest(BaseModel):

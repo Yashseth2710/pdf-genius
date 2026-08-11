@@ -63,7 +63,7 @@ export function PageOrganiser({
   if (organise.isSuccess) {
     return (
       <ToolResult
-        output={organise.data.output}
+        outputs={organise.data.outputs}
         onReset={() => {
           setPlan(initialPlan(pageCount))
           organise.reset()

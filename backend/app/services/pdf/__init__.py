@@ -9,7 +9,6 @@ from app.services.pdf.operations import (
     merge,
     split_by_ranges,
     split_every_page,
-    to_zip,
 )
 from app.services.pdf.ranges import PageRange, PageRangeError, parse_page_numbers, parse_page_ranges
 
@@ -26,5 +25,4 @@ __all__ = [
     "parse_page_ranges",
     "split_by_ranges",
     "split_every_page",
-    "to_zip",
 ]

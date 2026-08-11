@@ -3,7 +3,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import DocumentStatus
 
@@ -36,3 +36,14 @@ class DocumentListResponse(BaseModel):
 class DeletedResponse(BaseModel):
     id: uuid.UUID
     deleted: bool = True
+
+
+class ArchiveRequest(BaseModel):
+    """Documents to bundle into one download.
+
+    Capped because the whole archive is built in memory: it is a convenience
+    for collecting a split, not a way to export an entire account.
+    """
+
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=200)
+    name: str | None = Field(default=None, max_length=200)

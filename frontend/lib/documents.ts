@@ -100,7 +100,31 @@ export async function downloadDocument(id: string, filename: string): Promise<vo
     throw new ApiError('DOWNLOAD_FAILED', 'That file could not be downloaded.', response.status)
   }
 
-  const blob = await response.blob()
+  await saveBlob(await response.blob(), filename)
+}
+
+/**
+ * Downloads several documents as one zip.
+ *
+ * The archive is built by the server as it responds and never stored: it is a
+ * way of delivering files, not a document. Nothing in the user's list is ever
+ * an archive, which is what keeps every result previewable and reusable.
+ */
+export async function downloadArchive(ids: string[], filename: string): Promise<void> {
+  const response = await fetch(`${API_URL}/documents/archive`, {
+    method: 'POST',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ document_ids: ids, name: filename }),
+  })
+
+  if (!response.ok) {
+    throw new ApiError('DOWNLOAD_FAILED', 'Those files could not be downloaded.', response.status)
+  }
+
+  await saveBlob(await response.blob(), filename)
+}
+
+async function saveBlob(blob: Blob, filename: string): Promise<void> {
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url

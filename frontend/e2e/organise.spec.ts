@@ -247,25 +247,6 @@ test('a result can be checked before it is downloaded', async ({ page }) => {
   await expect(page.getByRole('dialog')).toContainText('page 1 of 2')
 })
 
-test('an archive says to download it rather than pretending to preview', async ({ page }) => {
-  await signUp(page)
-  await upload(page, 'report.pdf', 4)
-
-  // Splitting into several files produces a zip, which has nothing to draw.
-  await page.goto('/dashboard/tools/split')
-  await page.getByRole('radio', { name: /report\.pdf/ }).click()
-  await page.getByLabel('Pages to split out').fill('1, 2')
-  await page.getByRole('button', { name: 'Split PDF' }).click()
-  await expect(page.getByRole('status', { name: 'Result' })).toBeVisible()
-
-  await page.goto('/dashboard')
-  await page.getByRole('link', { name: 'report-split.zip' }).click()
-
-  await expect(
-    page.getByText('This is an archive. Download it to see what is inside.'),
-  ).toBeVisible()
-})
-
 test('choosing a different document starts from a clean plan', async ({ page }) => {
   await signUp(page)
   await upload(page, 'first.pdf', 3)

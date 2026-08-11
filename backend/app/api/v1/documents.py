@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.schemas.common import SuccessResponse
 from app.schemas.document import (
+    ArchiveRequest,
     DeletedResponse,
     DocumentListResponse,
     DocumentResponse,
@@ -68,6 +69,43 @@ def list_documents(
             limit=limit,
             offset=offset,
         )
+    )
+
+
+@router.post(
+    "/archive",
+    summary="Download several documents as one zip",
+    response_class=StreamingResponse,
+)
+def archive_documents(
+    payload: ArchiveRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+    storage: StorageDep,
+) -> StreamingResponse:
+    """Bundle documents into a zip, built now and never stored.
+
+    A zip is a way of delivering several files at once, not a document: keeping
+    one would put something in the user's list that cannot be previewed, merged
+    or organised. Each id is resolved with the usual ownership check, so this
+    cannot be used to reach a file belonging to someone else.
+    """
+    service = DocumentService(db, storage)
+    documents = [
+        service.get_owned(document_id, current_user) for document_id in payload.document_ids
+    ]
+
+    data = service.archive(documents)
+    filename = safe_download_name(payload.name or "documents.zip", fallback="documents.zip")
+
+    return StreamingResponse(
+        iter([data]),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f'attachment; filename="{filename}"',
+            "Content-Length": str(len(data)),
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 

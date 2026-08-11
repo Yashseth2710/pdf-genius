@@ -124,9 +124,16 @@ settings rather than constants — `MAX_MERGE_FILES` (20), `MAX_MERGE_TOTAL_MB`
 (100) and `MAX_SPLIT_OUTPUTS` (100). Beyond them the request is refused with an
 explanation instead of the process being killed.
 
-Filenames inside a ZIP descend from the user's own filename, so they are
+Filenames inside an archive descend from the user's own filename, so they are
 cleaned exactly as a `Content-Disposition` header is: an upload called
-`../../etc/passwd.pdf` becomes `passwd-1-3.pdf`, never a path.
+`../../etc/passwd.pdf` becomes `passwd-1-3.pdf`, never a path. Repeated names
+get a numbered suffix, because a zip with duplicate entries silently loses
+files in some extractors.
+
+`POST /documents/archive` resolves every id with the usual ownership check
+before reading anything, so it cannot be used to pull a file belonging to
+someone else into a bundle, and it is capped at 200 documents because the whole
+archive is built in memory.
 
 Because jobs run inside the request, a slow one occupies a worker for its
 duration. That is acceptable at this size and is the reason processing has its

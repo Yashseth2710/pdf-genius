@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+import zipfile
 from collections.abc import Iterator, Sequence
 from io import BytesIO
 from typing import BinaryIO
@@ -18,9 +19,9 @@ from app.core.errors import (
 from app.models import Document, User
 from app.models.enums import DocumentStatus
 from app.repositories.document import DocumentRepository
-from app.services.files.validation import PDF, SNIFF_BYTES, ZIP, sniff
+from app.services.files.validation import EXTENSIONS, PDF, SNIFF_BYTES, sniff
 from app.services.storage.base import Storage
-from app.services.storage.keys import new_document_key, new_output_key
+from app.services.storage.keys import new_document_key, new_output_key, safe_download_name
 from app.services.storage.local import FileTooLargeInStorage
 
 logger = logging.getLogger(__name__)
@@ -123,7 +124,7 @@ class DocumentService:
         retention sweep can tell the two apart: an upload is the user's only
         copy, while a result can be produced again.
         """
-        extension = "zip" if mime_type == ZIP else "pdf"
+        extension = EXTENSIONS.get(mime_type, "bin")
         key = new_output_key(user.id, extension)
 
         # No size check against the upload limit here: this file is ours, not
@@ -149,6 +150,33 @@ class DocumentService:
 
         logger.info("Stored output id=%s user=%s bytes=%d", document.id, user.id, stored.size)
         return document
+
+    def archive(self, documents: Sequence[Document]) -> bytes:
+        """Zip several documents together for a single download.
+
+        Built on demand and never stored: an archive is a delivery format, not
+        a document. Keeping one would put something in the user's list that
+        cannot be previewed, merged or organised.
+
+        Names are made unique inside the archive - two ranges of the same
+        source can easily both be called ``report-1-3.pdf`` - because a zip
+        with duplicate entries silently loses files in some extractors.
+        """
+        buffer = BytesIO()
+        used: dict[str, int] = {}
+
+        with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as bundle:
+            for document in documents:
+                name = safe_download_name(document.original_filename)
+                seen = used.get(name, 0)
+                used[name] = seen + 1
+                if seen:
+                    stem, _, suffix = name.rpartition(".")
+                    name = f"{stem} ({seen}).{suffix}" if stem else f"{name} ({seen})"
+
+                bundle.writestr(name, self.read_bytes(document))
+
+        return buffer.getvalue()
 
     def read_bytes(self, document: Document) -> bytes:
         """Load a stored document into memory for processing.
