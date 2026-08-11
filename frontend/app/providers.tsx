@@ -5,6 +5,7 @@ import { ThemeProvider } from 'next-themes'
 import { useState } from 'react'
 
 import { Toaster } from '@/components/ui/sonner'
+import { TooltipProvider } from '@/components/ui/tooltip'
 import { AuthProvider } from '@/hooks/use-auth'
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -33,8 +34,12 @@ export function Providers({ children }: { children: React.ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          {children}
-          <Toaster position="top-center" richColors />
+          {/* delay: a tooltip that appears instantly is noise when the pointer
+              is only passing over a button on its way somewhere else. */}
+          <TooltipProvider delay={400}>
+            {children}
+            <Toaster position="top-center" richColors />
+          </TooltipProvider>
         </AuthProvider>
       </QueryClientProvider>
     </ThemeProvider>

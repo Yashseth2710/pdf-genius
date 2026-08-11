@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ApiError } from '@/lib/api'
 import { deleteDocument, downloadDocument, listDocuments } from '@/lib/documents'
 import { formatBytes, formatPages } from '@/lib/format'
@@ -156,30 +157,46 @@ function DocumentRow({
         </p>
       </div>
 
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={handleDownload}
-        disabled={isDownloading}
-        aria-label={`Download ${document.original_filename}`}
-      >
-        {isDownloading ? (
-          <Loader2 className="animate-spin" aria-hidden />
-        ) : (
-          <Download aria-hidden />
-        )}
-      </Button>
+      {/* The icons carry an aria-label for screen readers; the tooltip is what
+          tells a sighted user what the icon does before they click it. */}
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={handleDownload}
+              disabled={isDownloading}
+            />
+          }
+          aria-label={`Download ${document.original_filename}`}
+        >
+          {isDownloading ? (
+            <Loader2 className="animate-spin" aria-hidden />
+          ) : (
+            <Download aria-hidden />
+          )}
+        </TooltipTrigger>
+        <TooltipContent>{isDownloading ? 'Downloading…' : 'Download'}</TooltipContent>
+      </Tooltip>
 
-      <Button
-        variant="ghost"
-        size="icon-sm"
-        onClick={onDelete}
-        disabled={isDeleting}
-        aria-label={`Delete ${document.original_filename}`}
-        className="text-muted-foreground hover:text-destructive"
-      >
-        {isDeleting ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />}
-      </Button>
+      <Tooltip>
+        <TooltipTrigger
+          render={
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={onDelete}
+              disabled={isDeleting}
+              className="text-muted-foreground hover:text-destructive"
+            />
+          }
+          aria-label={`Delete ${document.original_filename}`}
+        >
+          {isDeleting ? <Loader2 className="animate-spin" aria-hidden /> : <Trash2 aria-hidden />}
+        </TooltipTrigger>
+        <TooltipContent>{isDeleting ? 'Deleting…' : 'Delete'}</TooltipContent>
+      </Tooltip>
     </li>
   )
 }
