@@ -58,7 +58,7 @@ function saveButton() {
 
 beforeEach(() => {
   vi.clearAllMocks()
-  organiseDocument.mockResolvedValue({ job: { id: 'job-1' }, output })
+  organiseDocument.mockResolvedValue({ job: { id: 'job-1' }, outputs: [output] })
 })
 
 describe('PageOrganiser', () => {

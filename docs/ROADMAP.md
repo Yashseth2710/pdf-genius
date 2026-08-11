@@ -111,7 +111,8 @@ than being built twice.
 The first real tools, and the template every later tool copies.
 
 **Shipped — backend:** merge (2–20 PDFs, in the order given), split by page
-ranges, into every page, or into a selection; several outputs bundled as a ZIP.
+ranges, into every page, or into a selection — every output saved as a document
+of its own.
 A `ProcessingJob` row for every run, with `GET /jobs` to read them back. The
 page-range parser explains what is wrong with the text a user typed rather than
 reporting "invalid format".

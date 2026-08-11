@@ -1,4 +1,4 @@
-"""Merge and split as the API offers them.
+"""The tools as the API offers them.
 
 This layer sits between the routes and the pure functions in ``operations``:
 it loads the user's documents, enforces the limits, records a job, stores the
@@ -21,7 +21,7 @@ from app.core.errors import ProcessingError
 from app.models import Document, ProcessingJob, User
 from app.models.enums import OperationType
 from app.services.files.service import DocumentService
-from app.services.files.validation import PDF, ZIP
+from app.services.files.validation import PDF
 from app.services.jobs import JobService
 from app.services.pdf import operations
 from app.services.pdf.operations import OutputFile, PlannedPage, SourcePdf
@@ -33,10 +33,15 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class ToolResult:
-    """What a finished tool run produced: the job, and the document it made."""
+    """What a finished tool run produced: the job, and the documents it made.
+
+    A list even when there is one: a split into twelve pages produces twelve
+    documents, and giving the caller a different shape depending on how many
+    came out only pushes the branching outwards.
+    """
 
     job: ProcessingJob
-    output: Document
+    outputs: list[Document]
 
 
 class ToolService:
@@ -75,20 +80,19 @@ class ToolService:
 
         try:
             output = operations.merge(sources)
-            document = self._store(user, output, filename=output_name, mime_type=PDF)
+            document = self._store(user, output, filename=output_name)
         except Exception as exc:
             self.jobs.fail_from(job, exc)
             raise
 
-        self.jobs.complete(job, output_key=document.storage_path)
-        return ToolResult(job=job, output=document)
+        return self._finish(job, [document])
 
     # --- Split ---------------------------------------------------------
 
     def split_by_ranges(
         self, *, user: User, document_id: uuid.UUID, ranges_spec: str
     ) -> ToolResult:
-        """One output file per range; a zip when there is more than one."""
+        """One document per range, in the order the ranges were asked for."""
         document = self.documents.get_owned(document_id, user)
         source = self._as_source(document)
         page_count = self._page_count(document, source)
@@ -104,13 +108,12 @@ class ToolService:
         )
         try:
             outputs = operations.split_by_ranges(source, ranges)
-            stored = self._store_many(user, outputs, source_name=document.original_filename)
+            stored = self._store_all(user, outputs)
         except Exception as exc:
             self.jobs.fail_from(job, exc)
             raise
 
-        self.jobs.complete(job, output_key=stored.storage_path)
-        return ToolResult(job=job, output=stored)
+        return self._finish(job, stored)
 
     def split_every_page(self, *, user: User, document_id: uuid.UUID) -> ToolResult:
         document = self.documents.get_owned(document_id, user)
@@ -118,8 +121,8 @@ class ToolService:
         page_count = self._page_count(document, source)
 
         if page_count < 2:
-            # Splitting a one-page PDF returns the same document in a zip,
-            # which is a waste of everyone's time. Say so instead.
+            # Splitting a one-page PDF just copies it, which is a waste of
+            # everyone's time. Say so instead.
             raise ProcessingError("That document has only one page, so there is nothing to split.")
 
         self._check_output_count(page_count)
@@ -132,13 +135,12 @@ class ToolService:
         )
         try:
             outputs = operations.split_every_page(source)
-            stored = self._store_many(user, outputs, source_name=document.original_filename)
+            stored = self._store_all(user, outputs)
         except Exception as exc:
             self.jobs.fail_from(job, exc)
             raise
 
-        self.jobs.complete(job, output_key=stored.storage_path)
-        return ToolResult(job=job, output=stored)
+        return self._finish(job, stored)
 
     def extract_pages(self, *, user: User, document_id: uuid.UUID, pages: list[int]) -> ToolResult:
         """Pull selected pages into a single new PDF."""
@@ -156,13 +158,12 @@ class ToolService:
         )
         try:
             output = operations.extract_pages(source, chosen)
-            stored = self._store(user, output, filename=output.filename, mime_type=PDF)
+            stored = self._store(user, output, filename=output.filename)
         except Exception as exc:
             self.jobs.fail_from(job, exc)
             raise
 
-        self.jobs.complete(job, output_key=stored.storage_path)
-        return ToolResult(job=job, output=stored)
+        return self._finish(job, [stored])
 
     # --- Organise -------------------------------------------------------
 
@@ -194,18 +195,12 @@ class ToolService:
         )
         try:
             output = operations.apply_page_plan(source, plan)
-            stored = self._store(
-                user,
-                output,
-                filename=output_name or output.filename,
-                mime_type=PDF,
-            )
+            stored = self._store(user, output, filename=output_name or output.filename)
         except Exception as exc:
             self.jobs.fail_from(job, exc)
             raise
 
-        self.jobs.complete(job, output_key=stored.storage_path)
-        return ToolResult(job=job, output=stored)
+        return self._finish(job, [stored])
 
     def _check_plan(self, plan: Sequence[PlannedPage], page_count: int) -> None:
         """Refuse a plan the document cannot satisfy.
@@ -284,7 +279,9 @@ class ToolService:
                 f"{self.settings.max_split_outputs}. Split it in smaller pieces."
             )
 
-    def _store(self, user: User, output: OutputFile, *, filename: str, mime_type: str) -> Document:
+    def _store(
+        self, user: User, output: OutputFile, *, filename: str, mime_type: str = PDF
+    ) -> Document:
         return self.documents.store_output(
             user=user,
             data=output.data,
@@ -293,19 +290,19 @@ class ToolService:
             page_count=output.page_count if mime_type == PDF else None,
         )
 
-    def _store_many(self, user: User, outputs: list[OutputFile], *, source_name: str) -> Document:
-        """Store one output as a PDF, or several as a single zip.
+    def _store_all(self, user: User, outputs: list[OutputFile]) -> list[Document]:
+        """Save every produced file as a document in its own right.
 
-        A split always produces exactly one document either way, which keeps
-        the job's single ``output_path`` honest and means the result can be
-        downloaded with the endpoint that already exists.
+        Not an archive. A zip cannot be previewed, merged or organised, so
+        bundling a split into one made the result the only dead end in the app.
+        Downloading several at once still zips them - on the way out, in
+        ``documents.archive``, rather than as something stored.
         """
         if not outputs:
             raise ProcessingError("That selection produced no pages.")
 
-        if len(outputs) == 1:
-            return self._store(user, outputs[0], filename=outputs[0].filename, mime_type=PDF)
+        return [self._store(user, output, filename=output.filename) for output in outputs]
 
-        stem = operations.stem_of(source_name)
-        archive = operations.to_zip(outputs, filename=f"{stem}-split.zip")
-        return self._store(user, archive, filename=archive.filename, mime_type=ZIP)
+    def _finish(self, job: ProcessingJob, outputs: list[Document]) -> ToolResult:
+        self.jobs.complete(job, outputs=outputs)
+        return ToolResult(job=job, outputs=outputs)

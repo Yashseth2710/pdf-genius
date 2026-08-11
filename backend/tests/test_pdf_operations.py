@@ -6,9 +6,6 @@ order would pass any test that only counted them, so page identity is checked
 by writing a marker onto each page and reading it back.
 """
 
-import zipfile
-from io import BytesIO
-
 import pymupdf
 import pytest
 
@@ -294,37 +291,6 @@ def test_a_plan_names_its_output_after_the_source() -> None:
     result = operations.apply_page_plan(source("report.pdf", numbered("P", 2)), plan(1))
 
     assert result.filename == "report-organised.pdf"
-
-
-# --- Archives ----------------------------------------------------------
-
-
-def test_zip_contains_every_output_under_its_own_name() -> None:
-    outputs = operations.split_every_page(source("report.pdf", numbered("P", 3)))
-
-    archive = operations.to_zip(outputs, filename="report-split.zip")
-
-    with zipfile.ZipFile(BytesIO(archive.data)) as opened:
-        assert opened.namelist() == [
-            "report-page-1.pdf",
-            "report-page-2.pdf",
-            "report-page-3.pdf",
-        ]
-
-
-def test_files_inside_a_zip_are_still_readable_pdfs() -> None:
-    outputs = operations.split_every_page(source("report.pdf", numbered("P", 2)))
-
-    archive = operations.to_zip(outputs, filename="report-split.zip")
-
-    with zipfile.ZipFile(BytesIO(archive.data)) as opened:
-        assert labels_in(opened.read("report-page-1.pdf")) == ["P1"]
-
-
-def test_a_zip_reports_no_page_count_of_its_own() -> None:
-    outputs = operations.split_every_page(source("report.pdf", numbered("P", 3)))
-
-    assert operations.to_zip(outputs, filename="x.zip").page_count == 0
 
 
 # --- Opening sources ---------------------------------------------------

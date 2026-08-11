@@ -9,6 +9,7 @@ else's file.
 import uuid
 import zipfile
 from io import BytesIO
+from typing import Any
 
 import pymupdf
 from fastapi.testclient import TestClient
@@ -19,6 +20,8 @@ SPLIT = "/api/v1/tools/split"
 ORGANISE = "/api/v1/tools/organise"
 JOBS = "/api/v1/jobs"
 UPLOAD = "/api/v1/documents/upload"
+DOCUMENTS = "/api/v1/documents"
+ARCHIVE = "/api/v1/documents/archive"
 
 
 def make_pdf(labels: list[str]) -> bytes:
@@ -80,6 +83,16 @@ def error_of(response: Response) -> str:
     return str(response.json()["error"]["message"])
 
 
+def outputs_of(response: Response) -> list[dict[str, Any]]:
+    """Every document a run produced, in order."""
+    items: list[dict[str, Any]] = response.json()["data"]["outputs"]
+    return items
+
+
+def first_output(response: Response) -> dict[str, Any]:
+    return outputs_of(response)[0]
+
+
 # --- Merge -------------------------------------------------------------
 
 
@@ -90,7 +103,7 @@ def test_merge_produces_a_downloadable_document(authed_client: TestClient) -> No
     response = authed_client.post(MERGE, json={"document_ids": [first, second]})
 
     assert response.status_code == 200, response.text
-    output = response.json()["data"]["output"]
+    output = first_output(response)
     assert output["page_count"] == 5
     assert output["mime_type"] == "application/pdf"
     assert labels_in(download(authed_client, output["id"])) == ["A1", "A2", "B1", "B2", "B3"]
@@ -102,7 +115,7 @@ def test_merge_uses_the_order_in_the_request(authed_client: TestClient) -> None:
 
     response = authed_client.post(MERGE, json={"document_ids": [second, first]})
 
-    assert labels_in(download(authed_client, response.json()["data"]["output"]["id"])) == [
+    assert labels_in(download(authed_client, first_output(response)["id"])) == [
         "B1",
         "A1",
     ]
@@ -129,7 +142,7 @@ def test_merge_can_be_given_a_name(authed_client: TestClient) -> None:
         MERGE, json={"document_ids": ids, "output_name": "assignment.pdf"}
     )
 
-    assert response.json()["data"]["output"]["original_filename"] == "assignment.pdf"
+    assert first_output(response)["original_filename"] == "assignment.pdf"
 
 
 def test_merge_defaults_the_name_when_none_is_given(authed_client: TestClient) -> None:
@@ -137,7 +150,7 @@ def test_merge_defaults_the_name_when_none_is_given(authed_client: TestClient) -
 
     response = authed_client.post(MERGE, json={"document_ids": ids})
 
-    assert response.json()["data"]["output"]["original_filename"] == "merged.pdf"
+    assert first_output(response)["original_filename"] == "merged.pdf"
 
 
 def test_merge_refuses_a_single_document(authed_client: TestClient) -> None:
@@ -202,31 +215,63 @@ def test_split_by_one_range_returns_a_plain_pdf(authed_client: TestClient) -> No
         SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "2-4"}
     )
 
-    output = response.json()["data"]["output"]
+    output = first_output(response)
     assert output["mime_type"] == "application/pdf"
     assert output["page_count"] == 3
     assert labels_in(download(authed_client, output["id"])) == ["P2", "P3", "P4"]
 
 
-def test_split_by_several_ranges_returns_a_zip(authed_client: TestClient) -> None:
+def test_split_by_several_ranges_returns_a_document_each(authed_client: TestClient) -> None:
     document_id = upload_pdf(authed_client, "report.pdf", 10)
 
     response = authed_client.post(
         SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1-3, 5, 8-10"}
     )
 
-    output = response.json()["data"]["output"]
-    assert output["mime_type"] == "application/zip"
-    # A zip has no page count of its own.
-    assert output["page_count"] is None
+    outputs = outputs_of(response)
+    assert [output["original_filename"] for output in outputs] == [
+        "report-1-3.pdf",
+        "report-5.pdf",
+        "report-8-10.pdf",
+    ]
+    # Every one a PDF in its own right - not an archive, which could not be
+    # previewed, merged or organised.
+    assert {output["mime_type"] for output in outputs} == {"application/pdf"}
+    assert [output["page_count"] for output in outputs] == [3, 1, 3]
+    assert labels_in(download(authed_client, outputs[1]["id"])) == ["P5"]
 
-    with zipfile.ZipFile(BytesIO(download(authed_client, output["id"]))) as archive:
-        assert archive.namelist() == [
-            "report-1-3.pdf",
-            "report-5.pdf",
-            "report-8-10.pdf",
-        ]
-        assert labels_in(archive.read("report-5.pdf")) == ["P5"]
+
+def test_split_results_are_ordinary_documents(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 4)
+
+    authed_client.post(
+        SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1-2, 3-4"}
+    )
+
+    listing = authed_client.get(DOCUMENTS).json()["data"]
+    # The original plus its two parts, all listed together.
+    assert listing["total"] == 3
+    assert {item["mime_type"] for item in listing["items"]} == {"application/pdf"}
+
+
+def test_a_split_part_can_be_used_as_input_to_another_tool(authed_client: TestClient) -> None:
+    # The point of not producing an archive: the results are first-class.
+    document_id = upload_pdf(authed_client, "report.pdf", 6)
+    parts = outputs_of(
+        authed_client.post(
+            SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1-2, 5-6"}
+        )
+    )
+
+    merged = authed_client.post(MERGE, json={"document_ids": [parts[1]["id"], parts[0]["id"]]})
+
+    assert merged.status_code == 200, merged.text
+    assert labels_in(download(authed_client, first_output(merged)["id"])) == [
+        "P5",
+        "P6",
+        "P1",
+        "P2",
+    ]
 
 
 def test_split_explains_a_range_past_the_end(authed_client: TestClient) -> None:
@@ -264,15 +309,15 @@ def test_split_needs_a_range_when_the_mode_asks_for_one(authed_client: TestClien
 # --- Split every page --------------------------------------------------
 
 
-def test_every_page_returns_a_zip_of_single_pages(authed_client: TestClient) -> None:
+def test_every_page_returns_one_document_per_page(authed_client: TestClient) -> None:
     document_id = upload_pdf(authed_client, "report.pdf", 3)
 
     response = authed_client.post(SPLIT, json={"document_id": document_id, "mode": "every_page"})
 
-    output = response.json()["data"]["output"]
-    with zipfile.ZipFile(BytesIO(download(authed_client, output["id"]))) as archive:
-        assert len(archive.namelist()) == 3
-        assert labels_in(archive.read("report-page-2.pdf")) == ["P2"]
+    outputs = outputs_of(response)
+    assert len(outputs) == 3
+    assert outputs[1]["original_filename"] == "report-page-2.pdf"
+    assert labels_in(download(authed_client, outputs[1]["id"])) == ["P2"]
 
 
 def test_every_page_refuses_a_single_page_document(authed_client: TestClient) -> None:
@@ -294,7 +339,7 @@ def test_selected_pages_come_back_as_one_pdf(authed_client: TestClient) -> None:
         SPLIT, json={"document_id": document_id, "mode": "pages", "pages": [3, 1, 7]}
     )
 
-    output = response.json()["data"]["output"]
+    output = first_output(response)
     assert output["mime_type"] == "application/pdf"
     assert labels_in(download(authed_client, output["id"])) == ["P3", "P1", "P7"]
 
@@ -342,7 +387,7 @@ def test_organise_keeps_only_the_pages_it_is_sent(authed_client: TestClient) -> 
     response = organise(authed_client, document_id, [{"number": 1}, {"number": 3}, {"number": 5}])
 
     assert response.status_code == 200, response.text
-    output = response.json()["data"]["output"]
+    output = first_output(response)
     assert output["page_count"] == 3
     assert labels_in(download(authed_client, output["id"])) == ["P1", "P3", "P5"]
 
@@ -356,7 +401,7 @@ def test_organise_applies_order_and_rotation_together(authed_client: TestClient)
         [{"number": 4, "rotation": 90}, {"number": 1}, {"number": 2, "rotation": 180}],
     )
 
-    data = download(authed_client, response.json()["data"]["output"]["id"])
+    data = download(authed_client, first_output(response)["id"])
     assert labels_in(data) == ["P4", "P1", "P2"]
     assert rotations_in(data) == [90, 0, 180]
 
@@ -381,7 +426,7 @@ def test_organise_can_be_given_a_name(authed_client: TestClient) -> None:
 
     response = organise(authed_client, document_id, [{"number": 1}], output_name="tidied.pdf")
 
-    assert response.json()["data"]["output"]["original_filename"] == "tidied.pdf"
+    assert first_output(response)["original_filename"] == "tidied.pdf"
 
 
 def test_organise_names_the_result_after_the_source_by_default(authed_client: TestClient) -> None:
@@ -389,7 +434,7 @@ def test_organise_names_the_result_after_the_source_by_default(authed_client: Te
 
     response = organise(authed_client, document_id, [{"number": 1}])
 
-    assert response.json()["data"]["output"]["original_filename"] == "report-organised.pdf"
+    assert first_output(response)["original_filename"] == "report-organised.pdf"
 
 
 def test_organise_refuses_a_page_the_document_does_not_have(authed_client: TestClient) -> None:
@@ -458,14 +503,12 @@ def test_organise_needs_a_signed_in_user(api_client: TestClient) -> None:
 def test_an_organised_result_can_be_organised_again(authed_client: TestClient) -> None:
     # The output is an ordinary document, so it is a valid input to any tool.
     document_id = upload_pdf(authed_client, "report.pdf", 4)
-    first = organise(authed_client, document_id, [{"number": 3}, {"number": 1}]).json()["data"][
-        "output"
-    ]["id"]
+    first = first_output(organise(authed_client, document_id, [{"number": 3}, {"number": 1}]))["id"]
 
     response = organise(authed_client, first, [{"number": 2}])
 
     assert response.status_code == 200
-    assert labels_in(download(authed_client, response.json()["data"]["output"]["id"])) == ["P1"]
+    assert labels_in(download(authed_client, first_output(response)["id"])) == ["P1"]
 
 
 # --- Jobs --------------------------------------------------------------
@@ -515,9 +558,92 @@ def test_a_job_never_exposes_where_the_output_is_stored(authed_client: TestClien
     first = upload_pdf(authed_client, "a.pdf", 1)
     second = upload_pdf(authed_client, "b.pdf", 1)
 
-    job = authed_client.post(MERGE, json={"document_ids": [first, second]}).json()["data"]["job"]
+    response = authed_client.post(MERGE, json={"document_ids": [first, second]})
+    job = response.json()["data"]["job"]
 
     assert "output_path" not in job
+    # Results are named by document id, which is how everything else in the
+    # API refers to a file.
+    assert job["output_document_ids"] == [first_output(response)["id"]]
+
+
+def test_a_job_lists_every_document_it_produced(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 6)
+
+    response = authed_client.post(
+        SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1-2, 3-4, 5-6"}
+    )
+
+    ids = [output["id"] for output in outputs_of(response)]
+    assert response.json()["data"]["job"]["output_document_ids"] == ids
+
+
+# --- Downloading several at once ---------------------------------------
+
+
+def test_several_documents_download_as_one_archive(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 4)
+    parts = outputs_of(
+        authed_client.post(
+            SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1-2, 3-4"}
+        )
+    )
+
+    response = authed_client.post(
+        ARCHIVE, json={"document_ids": [part["id"] for part in parts], "name": "report-split.zip"}
+    )
+
+    assert response.status_code == 200, response.text
+    assert response.headers["content-type"] == "application/zip"
+    assert 'filename="report-split.zip"' in response.headers["content-disposition"]
+
+    with zipfile.ZipFile(BytesIO(response.content)) as archive:
+        assert archive.namelist() == ["report-1-2.pdf", "report-3-4.pdf"]
+        assert labels_in(archive.read("report-1-2.pdf")) == ["P1", "P2"]
+
+
+def test_an_archive_is_never_stored_as_a_document(authed_client: TestClient) -> None:
+    # It is a way of delivering files, not a file we keep.
+    document_id = upload_pdf(authed_client, "report.pdf", 2)
+    parts = outputs_of(
+        authed_client.post(SPLIT, json={"document_id": document_id, "mode": "every_page"})
+    )
+    before = authed_client.get(DOCUMENTS).json()["data"]["total"]
+
+    authed_client.post(ARCHIVE, json={"document_ids": [part["id"] for part in parts]})
+
+    assert authed_client.get(DOCUMENTS).json()["data"]["total"] == before
+
+
+def test_an_archive_gives_repeated_names_a_suffix(authed_client: TestClient) -> None:
+    # Two ranges of the same source can genuinely produce the same filename,
+    # and a zip with duplicate entries loses files in some extractors.
+    first = upload_pdf(authed_client, "report.pdf", 2)
+    second = upload_pdf(authed_client, "report.pdf", 2)
+
+    response = authed_client.post(ARCHIVE, json={"document_ids": [first, second]})
+
+    with zipfile.ZipFile(BytesIO(response.content)) as archive:
+        assert archive.namelist() == ["report.pdf", "report (1).pdf"]
+
+
+def test_an_archive_cannot_reach_another_users_document(authed_client: TestClient) -> None:
+    mine = upload_pdf(authed_client, "mine.pdf", 1)
+    theirs = _upload_as_other_user(authed_client)
+
+    response = authed_client.post(ARCHIVE, json={"document_ids": [mine, theirs]})
+
+    assert response.status_code == 404
+
+
+def test_an_archive_needs_at_least_one_document(authed_client: TestClient) -> None:
+    assert authed_client.post(ARCHIVE, json={"document_ids": []}).status_code == 422
+
+
+def test_an_archive_needs_a_signed_in_user(api_client: TestClient) -> None:
+    response = api_client.post(ARCHIVE, json={"document_ids": [str(uuid.uuid4())]})
+
+    assert response.status_code == 401
 
 
 def test_another_users_job_is_reported_as_missing(authed_client: TestClient) -> None:
@@ -555,9 +681,9 @@ def test_a_result_appears_in_the_document_list(authed_client: TestClient) -> Non
 def test_a_result_can_be_deleted_like_any_other_document(authed_client: TestClient) -> None:
     first = upload_pdf(authed_client, "a.pdf", 1)
     second = upload_pdf(authed_client, "b.pdf", 1)
-    output_id = authed_client.post(MERGE, json={"document_ids": [first, second]}).json()["data"][
-        "output"
-    ]["id"]
+    output_id = first_output(authed_client.post(MERGE, json={"document_ids": [first, second]}))[
+        "id"
+    ]
 
     assert authed_client.delete(f"/api/v1/documents/{output_id}").status_code == 200
     assert authed_client.get(f"/api/v1/documents/{output_id}").status_code == 404

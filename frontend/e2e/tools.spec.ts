@@ -89,7 +89,7 @@ test('two PDFs can be merged and the result downloaded', async ({ page }) => {
   await expect(result).toContainText('4 pages')
 
   const download = page.waitForEvent('download')
-  await result.getByRole('button', { name: 'Download' }).click()
+  await result.getByRole('button', { name: 'Download merged.pdf' }).click()
   expect((await download).suggestedFilename()).toBe('merged.pdf')
 })
 
@@ -139,11 +139,11 @@ test('a PDF can be split by page range', async ({ page }) => {
   await expect(result).toContainText('3 pages')
 
   const download = page.waitForEvent('download')
-  await result.getByRole('button', { name: 'Download' }).click()
+  await result.getByRole('button', { name: 'Download report-2-4.pdf' }).click()
   expect((await download).suggestedFilename()).toBe('report-2-4.pdf')
 })
 
-test('several ranges come back as a ZIP', async ({ page }) => {
+test('several ranges come back as separate PDFs, not an archive', async ({ page }) => {
   await signUp(page)
   await upload(page, 'report.pdf', 8)
 
@@ -152,7 +152,42 @@ test('several ranges come back as a ZIP', async ({ page }) => {
   await page.getByLabel('Pages to split out').fill('1-2, 5, 7-8')
   await page.getByRole('button', { name: 'Split PDF' }).click()
 
-  await expect(page.getByRole('status', { name: 'Result' })).toContainText('ZIP archive')
+  const result = page.getByRole('status', { name: 'Result' })
+  await expect(result).toContainText('Done — 3 files')
+  await expect(result.getByRole('listitem')).toHaveCount(3)
+  await expect(result).toContainText('report-1-2.pdf')
+  await expect(result).toContainText('report-7-8.pdf')
+
+  // Each part downloads on its own...
+  const one = page.waitForEvent('download')
+  await result.getByRole('button', { name: 'Download report-5.pdf' }).click()
+  expect((await one).suggestedFilename()).toBe('report-5.pdf')
+
+  // ...and they can still be collected in one go, zipped on the way out.
+  const all = page.waitForEvent('download')
+  await result.getByRole('button', { name: 'Download all 3' }).click()
+  expect((await all).suggestedFilename()).toBe('report-split.zip')
+})
+
+test('split results are ordinary documents that other tools can use', async ({ page }) => {
+  await signUp(page)
+  await upload(page, 'report.pdf', 6)
+
+  await page.goto('/dashboard/tools/split')
+  await page.getByRole('radio', { name: /report\.pdf/ }).click()
+  await page.getByLabel('Pages to split out').fill('1-2, 5-6')
+  await page.getByRole('button', { name: 'Split PDF' }).click()
+  await expect(page.getByRole('status', { name: 'Result' })).toBeVisible()
+
+  // They are in the documents list, previewable, and offered by other tools -
+  // none of which is true of an archive.
+  await page.goto('/dashboard')
+  await expect(page.getByText('report-1-2.pdf')).toBeVisible()
+  await expect(page.getByRole('button', { name: 'Preview report-1-2.pdf' })).toBeVisible()
+
+  await page.goto('/dashboard/tools/merge')
+  await expect(page.getByRole('checkbox', { name: /report-1-2\.pdf/ })).toBeVisible()
+  await expect(page.getByRole('checkbox', { name: /report-5-6\.pdf/ })).toBeVisible()
 })
 
 test('a page range past the end of the document is explained, not swallowed', async ({ page }) => {

@@ -26,7 +26,7 @@ const MODES: { value: SplitMode; title: string; description: string }[] = [
   {
     value: 'every_page',
     title: 'Every page separately',
-    description: 'One file per page, delivered as a ZIP.',
+    description: 'One file per page, each saved as its own PDF.',
   },
   {
     value: 'pages',
@@ -120,7 +120,7 @@ export default function SplitPage() {
               maxLength={1000}
             />
             <p className="text-muted-foreground text-xs">
-              Each range becomes its own file. Several ranges arrive as a ZIP.
+              Each range becomes its own PDF, saved to your documents.
               {chosen?.page_count ? ` This PDF has ${chosen.page_count} pages.` : ''}
             </p>
           </div>
@@ -180,7 +180,13 @@ export default function SplitPage() {
         )}
       </div>
 
-      {split.isSuccess && <ToolResult output={split.data.output} onReset={reset} />}
+      {split.isSuccess && (
+        <ToolResult
+          outputs={split.data.outputs}
+          onReset={reset}
+          archiveName={`${(chosen?.original_filename ?? 'document').replace(/\.pdf$/i, '')}-split.zip`}
+        />
+      )}
     </ToolShell>
   )
 }

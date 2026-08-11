@@ -60,7 +60,7 @@ beforeEach(() => {
   listDocuments.mockResolvedValue(page)
   splitDocument.mockResolvedValue({
     job: { id: 'job-1', operation: 'SPLIT', status: 'COMPLETED' },
-    output: doc('out', 'report-2-4.pdf', 3),
+    outputs: [doc('out', 'report-2-4.pdf', 3)],
   })
   consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
 })
@@ -149,7 +149,9 @@ describe('Split page', () => {
 
     const result = await screen.findByRole('status', { name: 'Result' })
     expect(within(result).getByText('report-2-4.pdf')).toBeInTheDocument()
-    expect(within(result).getByRole('button', { name: 'Download' })).toBeInTheDocument()
+    expect(
+      within(result).getByRole('button', { name: 'Download report-2-4.pdf' }),
+    ).toBeInTheDocument()
   })
 
   it('shows the reason a range was rejected', async () => {

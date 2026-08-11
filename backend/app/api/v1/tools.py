@@ -30,7 +30,7 @@ def _response(result: ToolResult) -> SuccessResponse[ToolRunResponse]:
     return SuccessResponse(
         data=ToolRunResponse(
             job=JobResponse.model_validate(result.job),
-            output=DocumentResponse.model_validate(result.output),
+            outputs=[DocumentResponse.model_validate(output) for output in result.outputs],
         )
     )
 

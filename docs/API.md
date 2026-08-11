@@ -179,6 +179,20 @@ header (`../../etc/passwd.pdf` becomes `passwd.pdf`).
 
 The client asks for a document **by id and never names a path**.
 
+### `POST /documents/archive`
+
+```jsonc
+{ "document_ids": ["8c1f...", "3a90..."], "name": "report-split.zip" }
+```
+
+Streams a zip of the named documents, **built as it responds and never
+stored**. A zip is a way of delivering several files at once, not a document.
+
+Each id goes through the same ownership check as everything else, so one
+belonging to another user returns 404 and the archive is not produced. Capped
+at 200 documents: it is a convenience for collecting a split, not a way to
+export an account.
+
 ### `DELETE /documents/{id}`
 
 Removes the record, then the file.
@@ -195,10 +209,17 @@ and a second process, for work that is already fast. A `ProcessingJob` row is
 still written for every run, so history works and moving to a queue later
 changes the execution, not the data.
 
-Every run produces **exactly one output document**, saved like any upload: it
-appears in `GET /documents`, downloads through `GET /documents/{id}/download`,
-and is deleted the same way. Where several files come out of a split, they are
-bundled into one ZIP.
+Every run produces **one or more output documents**, each saved like any
+upload: they appear in `GET /documents`, download through
+`GET /documents/{id}/download`, and are deleted the same way. A split into
+twelve pages produces twelve documents.
+
+**Nothing is ever stored as an archive.** An archive cannot be previewed,
+merged or organised, so bundling a split into one would make the result the
+only dead end in the app. `POST /documents/archive` zips several documents on
+the way out when someone wants them in a single download.
+
+`outputs` is always a list, even for a merge that produces one file.
 
 ### `POST /tools/merge`
 
@@ -214,8 +235,10 @@ it is what the user dragged the files into, and the server does not reorder it.
 {
   "success": true,
   "data": {
-    "job": { "id": "…", "operation": "MERGE", "status": "COMPLETED", "options": { }, "error_message": null },
-    "output": { "id": "…", "original_filename": "assignment.pdf", "mime_type": "application/pdf", "page_count": 12 }
+    "job": { "id": "…", "operation": "MERGE", "status": "COMPLETED", "output_document_ids": ["…"], "options": { }, "error_message": null },
+    "outputs": [
+      { "id": "…", "original_filename": "assignment.pdf", "mime_type": "application/pdf", "page_count": 12 }
+    ]
   }
 }
 ```
@@ -282,8 +305,8 @@ Jobs are recorded as `ORGANISE`, with the plan and the original page count in
 
 | mode | field | result |
 | --- | --- | --- |
-| `ranges` | `ranges` — `"1-3, 5, 8-10"` | one PDF per range; a ZIP when there is more than one |
-| `every_page` | — | one PDF per page, always a ZIP |
+| `ranges` | `ranges` — `"1-3, 5, 8-10"` | one PDF per range, each its own document |
+| `every_page` | — | one PDF per page |
 | `pages` | `pages` — `[2, 5, 9]` | a single PDF holding those pages, in that order |
 
 Ranges are 1-based and inclusive, may overlap, and come out in the order
@@ -328,8 +351,9 @@ Your processing history, newest first. `operation` is optional.
 ```
 
 `document_id` is the input, and is `null` for a merge, which has several — the
-inputs are recorded in `options` instead. As with documents, **`output_path` is
-never returned**: the result is reached by its document id.
+inputs are recorded in `options` instead. `output_document_ids` names what came
+out, in order. As with documents, **no storage path is ever returned**: results
+are reached by document id.
 
 ### `GET /jobs/{id}`
 
