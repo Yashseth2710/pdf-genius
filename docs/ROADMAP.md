@@ -21,8 +21,8 @@ A scope is finished only when all of this is true (spec section 64):
 | 4  | File infrastructure       | L    | 3          | ✅ Done |
 | 5  | Merge and split           | M    | 4          | ✅ Done |
 | 6  | Page organisation         | L    | 5          | ✅ Done |
-| 7  | Compression and conversion| M    | 4          | Next   |
-| 8  | Watermark                 | S    | 4          |        |
+| 7  | Compression and conversion| M    | 4          | ✅ Done |
+| 8  | Watermark                 | S    | 4          | Next   |
 | 9  | Dashboard and history     | M    | 5–8        |        |
 | 10 | AI features               | L    | 4          |        |
 | 11 | Hardening                 | M    | 2–10       |        |
@@ -187,15 +187,85 @@ the main thread and freezes the tab.
 
 ---
 
-## 7. Compression and conversion
+## 7. Compression and conversion ✅
 
-- Compress with Basic / Balanced / Strong, reporting the **actual** size and
-  reduction after processing, never an estimate beforehand
-- JPG/PNG → PDF with ordering, page size and orientation
-- PDF → JPG/PNG for all or selected pages, ZIP when multiple
+**Shipped — backend:** `POST /tools/compress` with Basic, Balanced and Strong,
+and `POST /tools/images-to-pdf`.
 
-**Watch out for:** compression that cannot shrink a file must say so plainly
-rather than returning a larger file and calling it a success.
+Compression is two different jobs wearing one name. Basic is lossless — unused
+objects collected, streams deflated — while Balanced and Strong redraw the
+*images* at lower resolutions, which is where the megabytes in a scan actually
+are. Text and vector drawings are never touched at any level, and neither are
+1-bit images, which in a PDF are almost always scanned text. Degrading those
+would trade legibility for a rounding error.
+
+**The warning above was right, and pointed at the wrong file.** A PDF that
+cannot be made smaller now returns a completed job with *no output* and the
+measured sizes on it, rather than a copy of the same size called a success. To
+count as smaller a file must lose at least 1% **and** at least 10KB: a
+percentage alone calls 70 bytes off a tiny document a 5% win, and a byte count
+alone calls 40KB off a 200MB scan one.
+
+Nothing anywhere estimates the saving beforehand. The same level takes 90% off
+a photographed scan and nothing off a page of text, and the only honest way to
+know which one this is, is to do the work and measure.
+
+**Dropped from this scope: PDF → images.** It was built and then taken back
+out, deliberately. Every other tool here takes documents and gives documents
+back; exporting pages as JPGs produces files the rest of the app can only hand
+straight back to you, and it made the ZIP question — settled in scope 5 —
+awkward all over again. Cutting it also removed the one operation whose output
+could dwarf its input, and with it a megapixel budget the user could hit
+without understanding why.
+
+The original plan's third bullet, "PDF → JPG/PNG … ZIP when multiple", is
+therefore not shipped, and the ZIP half of it was wrong regardless: scope 5
+removed stored archives, and reintroducing one here would have rebuilt the dead
+end.
+
+**Images → PDF takes what the rest of the industry takes**, not just the two
+formats scope 4 happened to accept: JPG, PNG, GIF, BMP, TIFF, WEBP and HEIC.
+That set was chosen by checking Smallpdf, Adobe Acrobat and iLovePDF rather
+than by guessing. HEIC is the one that matters — it is what an iPhone writes by
+default, so refusing it turns away the commonest photo there is over a
+container format. It costs one dependency, `pillow-heif`.
+
+PyMuPDF reads five of the seven itself. WEBP and HEIC go through Pillow and are
+handed on re-encoded — as PNG when the image has transparency and JPEG when it
+does not, because JPEG has no alpha channel and flattening a cut-out onto black
+is a silent way to ruin one. A test caught exactly that, on the first attempt.
+
+Two of the seven cannot be **previewed**, only converted: no browser outside
+Safari draws a TIFF or a HEIC. Rather than offer a button that opens an empty
+box, those files simply have no preview, and the document page says why.
+
+**Shipped — frontend:** two tool pages, plus the first **image** picker in the
+app — every other one filters to PDFs. Ordering, previewing and the picker
+placeholders are now shared components rather than a second copy each: merge
+and images → PDF ask the same question, so they use the same list.
+
+**Images became previewable**, in the document list, on the document page and
+in the picker. Uploading a JPG has been possible since scope 4, but nothing
+could show you one, so choosing the right photo meant downloading it first —
+the same dead end as an archive, in a different shape.
+
+**One migration**, which the plan had not foreseen: jobs gained
+`result_metadata`. `input_metadata` holds what a job was asked to do, and
+writing a measured result into it would have made the name a lie — and a number
+that lives only in the response is lost on the next page load.
+
+**Also fixed here:** PyMuPDF's `keep_proportion` does not, in this version —
+a square photo came out as a full-bleed A4 oblong whatever the flag said. The
+fitted rectangle is now worked out in our own code. A stretched face is the
+first thing anyone notices and the last thing anything reports.
+
+**Shipped — tests:** 29 backend unit tests that reopen the produced bytes and
+measure them, 26 backend integration, 23 frontend and 5 end to end. Totals:
+**172 backend unit, 127 backend integration, 129 frontend, 40 Playwright.**
+
+Three of them found real bugs before anyone else could: the fitted rectangle,
+the transparent WEBP flattened onto black, and the multi-page TIFF that lost
+two of its three pages in one of the two page modes.
 
 ---
 

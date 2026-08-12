@@ -1,4 +1,4 @@
-"""The merge, organise and split endpoints, end to end.
+"""The merge, organise, split, compress and convert endpoints, end to end.
 
 These run against a real database and real files on disk, so they cover the
 parts unit tests cannot: that a job row is written, that the result becomes a
@@ -8,16 +8,21 @@ else's file.
 
 import uuid
 import zipfile
+from functools import cache
 from io import BytesIO
 from typing import Any
 
 import pymupdf
+import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
+from PIL import Image
 
 MERGE = "/api/v1/tools/merge"
 SPLIT = "/api/v1/tools/split"
 ORGANISE = "/api/v1/tools/organise"
+COMPRESS = "/api/v1/tools/compress"
+IMAGES_TO_PDF = "/api/v1/tools/images-to-pdf"
 JOBS = "/api/v1/jobs"
 UPLOAD = "/api/v1/documents/upload"
 DOCUMENTS = "/api/v1/documents"
@@ -52,6 +57,40 @@ def upload_png(client: TestClient, name: str = "photo.png") -> str:
         "0d0a2db40000000049454e44ae426082"
     )
     response = client.post(UPLOAD, files={"file": (name, png, "image/png")})
+    return str(response.json()["data"]["id"])
+
+
+def upload_photo(client: TestClient, name: str, width: int, height: int) -> str:
+    """Upload a real JPEG of a given shape, and return its id."""
+    image = Image.new("RGB", (width, height), "red")
+    buffer = BytesIO()
+    image.save(buffer, "JPEG")
+    response = client.post(UPLOAD, files={"file": (name, buffer.getvalue(), "image/jpeg")})
+    assert response.status_code == 201, response.text
+    return str(response.json()["data"]["id"])
+
+
+@cache
+def scan_bytes(pages: int = 2) -> bytes:
+    """A PDF of full-page photographs - something worth compressing.
+
+    Detailed rather than flat: a page of one colour compresses to almost
+    nothing whatever we do to it, which would make every level look equally
+    good. Built once and reused, because it is the slowest thing in this file.
+    """
+    buffer = BytesIO()
+    Image.effect_noise((1600, 2200), 64).convert("RGB").save(buffer, "JPEG", quality=95)
+
+    with pymupdf.open() as document:
+        for _ in range(pages):
+            page = document.new_page(width=595, height=842)
+            page.insert_image(page.rect, stream=buffer.getvalue())
+        return bytes(document.tobytes(deflate=True))
+
+
+def upload_scan(client: TestClient, name: str = "scan.pdf", pages: int = 2) -> str:
+    response = client.post(UPLOAD, files={"file": (name, scan_bytes(pages), "application/pdf")})
+    assert response.status_code == 201, response.text
     return str(response.json()["data"]["id"])
 
 
@@ -687,6 +726,251 @@ def test_a_result_can_be_deleted_like_any_other_document(authed_client: TestClie
 
     assert authed_client.delete(f"/api/v1/documents/{output_id}").status_code == 200
     assert authed_client.get(f"/api/v1/documents/{output_id}").status_code == 404
+
+
+# --- Compress -----------------------------------------------------------
+
+
+def test_compress_produces_a_smaller_document(authed_client: TestClient) -> None:
+    scan = upload_scan(authed_client)
+    original = len(download(authed_client, scan))
+
+    response = authed_client.post(COMPRESS, json={"document_id": scan, "level": "strong"})
+
+    assert response.status_code == 200, response.text
+    output = first_output(response)
+    assert output["file_size"] < original
+    # And the file the user gets is really that size, not a number we reported.
+    assert len(download(authed_client, output["id"])) == output["file_size"]
+
+
+def test_compress_reports_the_measured_sizes_on_the_job(authed_client: TestClient) -> None:
+    scan = upload_scan(authed_client)
+
+    job = authed_client.post(COMPRESS, json={"document_id": scan, "level": "balanced"}).json()[
+        "data"
+    ]["job"]
+
+    assert job["operation"] == "COMPRESS"
+    assert job["status"] == "COMPLETED"
+    result = job["result"]
+    assert result["shrank"] is True
+    assert result["final_size"] < result["original_size"]
+    assert result["saved_bytes"] == result["original_size"] - result["final_size"]
+    assert 0 < result["saved_percent"] <= 100
+
+
+def test_the_measured_sizes_survive_a_reload(authed_client: TestClient) -> None:
+    # The whole reason the result is stored rather than only returned: reopening
+    # the history has to show the same numbers.
+    scan = upload_scan(authed_client)
+    job_id = authed_client.post(COMPRESS, json={"document_id": scan, "level": "strong"}).json()[
+        "data"
+    ]["job"]["id"]
+
+    reloaded = authed_client.get(f"{JOBS}/{job_id}").json()["data"]
+
+    assert reloaded["result"]["shrank"] is True
+    assert reloaded["result"]["saved_bytes"] > 0
+
+
+def test_a_pdf_that_cannot_shrink_produces_nothing_and_says_so(
+    authed_client: TestClient,
+) -> None:
+    """A completed job with no outputs, not a failure and not a pointless copy."""
+    plain = upload_pdf(authed_client, "notes.pdf", 2)
+
+    response = authed_client.post(COMPRESS, json={"document_id": plain, "level": "strong"})
+
+    assert response.status_code == 200, response.text
+    assert outputs_of(response) == []
+    job = response.json()["data"]["job"]
+    assert job["status"] == "COMPLETED"
+    assert job["error_message"] is None
+    assert job["result"]["shrank"] is False
+    assert job["result"]["saved_bytes"] == 0
+
+
+def test_nothing_is_added_to_the_documents_when_compression_gains_nothing(
+    authed_client: TestClient,
+) -> None:
+    plain = upload_pdf(authed_client, "notes.pdf", 2)
+
+    authed_client.post(COMPRESS, json={"document_id": plain, "level": "strong"})
+
+    assert authed_client.get(DOCUMENTS).json()["data"]["total"] == 1
+
+
+def test_compress_defaults_to_balanced(authed_client: TestClient) -> None:
+    scan = upload_scan(authed_client)
+
+    job = authed_client.post(COMPRESS, json={"document_id": scan}).json()["data"]["job"]
+
+    assert job["options"]["level"] == "balanced"
+
+
+def test_compress_refuses_an_unknown_level(authed_client: TestClient) -> None:
+    scan = upload_scan(authed_client)
+
+    response = authed_client.post(COMPRESS, json={"document_id": scan, "level": "maximum"})
+
+    assert response.status_code == 422
+
+
+def test_compress_refuses_an_image(authed_client: TestClient) -> None:
+    png = upload_png(authed_client)
+
+    response = authed_client.post(COMPRESS, json={"document_id": png})
+
+    assert response.status_code == 422
+    assert "not a PDF" in error_of(response)
+
+
+def test_compress_cannot_reach_another_users_document(authed_client: TestClient) -> None:
+    theirs = _upload_as_other_user(authed_client)
+
+    response = authed_client.post(COMPRESS, json={"document_id": theirs})
+
+    assert response.status_code == 404
+
+
+def test_compress_needs_a_signed_in_user(api_client: TestClient) -> None:
+    response = api_client.post(COMPRESS, json={"document_id": str(uuid.uuid4())})
+
+    assert response.status_code == 401
+
+
+# --- Images into a PDF ---------------------------------------------------
+
+
+def test_images_become_one_pdf_with_a_page_each(authed_client: TestClient) -> None:
+    first = upload_photo(authed_client, "one.jpg", 800, 600)
+    second = upload_photo(authed_client, "two.jpg", 600, 800)
+
+    response = authed_client.post(IMAGES_TO_PDF, json={"document_ids": [first, second]})
+
+    assert response.status_code == 200, response.text
+    output = first_output(response)
+    assert output["page_count"] == 2
+    assert output["mime_type"] == "application/pdf"
+    assert download(authed_client, output["id"]).startswith(b"%PDF")
+
+
+def test_images_to_pdf_records_a_convert_job(authed_client: TestClient) -> None:
+    ids = [upload_photo(authed_client, "one.jpg", 400, 400)]
+
+    job = authed_client.post(IMAGES_TO_PDF, json={"document_ids": ids}).json()["data"]["job"]
+
+    assert job["operation"] == "CONVERT"
+    assert job["status"] == "COMPLETED"
+    # Both directions are CONVERT, so the direction has to be on the job for
+    # history to tell them apart.
+    assert job["options"]["direction"] == "images_to_pdf"
+    assert job["options"]["document_ids"] == ids
+
+
+def test_page_size_and_orientation_reach_the_document(authed_client: TestClient) -> None:
+    ids = [upload_photo(authed_client, "wide.jpg", 1200, 600)]
+
+    response = authed_client.post(
+        IMAGES_TO_PDF,
+        json={"document_ids": ids, "page_size": "letter", "orientation": "landscape"},
+    )
+
+    data = download(authed_client, first_output(response)["id"])
+    with pymupdf.open(stream=data, filetype="pdf") as document:
+        assert (round(document[0].rect.width), round(document[0].rect.height)) == (792, 612)
+
+
+def test_images_to_pdf_can_be_given_a_name(authed_client: TestClient) -> None:
+    ids = [upload_photo(authed_client, "one.jpg", 400, 400)]
+
+    response = authed_client.post(
+        IMAGES_TO_PDF, json={"document_ids": ids, "output_name": "album.pdf"}
+    )
+
+    assert first_output(response)["original_filename"] == "album.pdf"
+
+
+@pytest.mark.parametrize(
+    ("pillow_format", "name", "mime"),
+    [
+        ("JPEG", "photo.jpg", "image/jpeg"),
+        ("PNG", "logo.png", "image/png"),
+        ("GIF", "animation.gif", "image/gif"),
+        ("BMP", "scan.bmp", "image/bmp"),
+        ("TIFF", "scan.tiff", "image/tiff"),
+        ("WEBP", "shot.webp", "image/webp"),
+        ("HEIF", "IMG_0421.heic", "image/heic"),
+    ],
+)
+def test_every_accepted_image_type_uploads_and_converts(
+    authed_client: TestClient, pillow_format: str, name: str, mime: str
+) -> None:
+    """The whole path for each type: sniffed on upload, stored, then converted.
+
+    Worth doing per type rather than per layer, because the two halves can
+    disagree - a format the converter reads but the uploader refuses is just as
+    broken as the reverse, and neither shows up in a test of one of them.
+    """
+    buffer = BytesIO()
+    Image.new("RGB", (400, 300), "red").save(buffer, pillow_format)
+
+    upload = authed_client.post(UPLOAD, files={"file": (name, buffer.getvalue(), mime)})
+    assert upload.status_code == 201, upload.text
+    assert upload.json()["data"]["mime_type"] == mime
+
+    response = authed_client.post(
+        IMAGES_TO_PDF, json={"document_ids": [upload.json()["data"]["id"]]}
+    )
+
+    assert response.status_code == 200, response.text
+    assert first_output(response)["page_count"] == 1
+
+
+def test_the_declared_content_type_does_not_decide_what_a_file_is(
+    authed_client: TestClient,
+) -> None:
+    # A HEIC uploaded as "image/png" is still stored as a HEIC: the bytes
+    # decide, and the wider format list did not weaken that.
+    buffer = BytesIO()
+    Image.new("RGB", (100, 100), "blue").save(buffer, "HEIF")
+
+    upload = authed_client.post(UPLOAD, files={"file": ("lie.png", buffer.getvalue(), "image/png")})
+
+    assert upload.status_code == 201, upload.text
+    assert upload.json()["data"]["mime_type"] == "image/heic"
+
+
+def test_images_to_pdf_refuses_a_pdf(authed_client: TestClient) -> None:
+    pdf = upload_pdf(authed_client, "report.pdf", 1)
+
+    response = authed_client.post(IMAGES_TO_PDF, json={"document_ids": [pdf]})
+
+    assert response.status_code == 422
+    assert "not an image" in error_of(response)
+
+
+def test_images_to_pdf_needs_at_least_one_image(authed_client: TestClient) -> None:
+    response = authed_client.post(IMAGES_TO_PDF, json={"document_ids": []})
+
+    assert response.status_code == 422
+
+
+def test_images_to_pdf_cannot_reach_another_users_document(authed_client: TestClient) -> None:
+    theirs = _upload_as_other_user(authed_client)
+    mine = upload_photo(authed_client, "mine.jpg", 400, 400)
+
+    # Listed alongside one of my own, which is the shape this check exists for.
+    response = authed_client.post(IMAGES_TO_PDF, json={"document_ids": [mine, theirs]})
+
+    assert response.status_code == 404
+
+
+def test_images_to_pdf_needs_a_signed_in_user(api_client: TestClient) -> None:
+    response = api_client.post(IMAGES_TO_PDF, json={"document_ids": [str(uuid.uuid4())]})
+
+    assert response.status_code == 401
 
 
 def _upload_as_other_user(client: TestClient) -> str:

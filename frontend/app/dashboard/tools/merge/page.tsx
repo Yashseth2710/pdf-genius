@@ -4,17 +4,17 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Combine, Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
-import { MergeOrder } from '@/components/tools/merge-order'
-import { PdfMultiSelect } from '@/components/tools/pdf-picker'
+import { PdfMultiSelect } from '@/components/tools/document-picker'
+import { FileOrder } from '@/components/tools/file-order'
 import { ToolResult } from '@/components/tools/tool-result'
 import { ToolShell, ToolStep } from '@/components/tools/tool-shell'
-import { usePdfDocuments } from '@/components/tools/use-pdfs'
+import { usePdfDocuments } from '@/components/tools/use-documents'
+import { resolveSelection, useOrderedSelection } from '@/components/tools/use-ordered-selection'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { ApiError } from '@/lib/api'
 import { mergeDocuments } from '@/lib/tools'
-import type { DocumentSummary } from '@/types/api'
 
 const MAX_FILES = 20
 
@@ -22,9 +22,7 @@ export default function MergePage() {
   const queryClient = useQueryClient()
   const { pdfs, isPending, isError, error, hasOnlyNonPdfs, refetch } = usePdfDocuments()
 
-  // The selection is held as an ordered list of ids rather than a Set: the
-  // order is the whole point of this tool, and a Set does not promise one.
-  const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const selection = useOrderedSelection()
   const [outputName, setOutputName] = useState('merged.pdf')
 
   const merge = useMutation({
@@ -35,30 +33,10 @@ export default function MergePage() {
     },
   })
 
-  // Resolved every render from the ids, so a document deleted in another tab
-  // simply drops out instead of leaving a row pointing at nothing.
-  const chosen = selectedIds
-    .map((id) => pdfs.find((item) => item.id === id))
-    .filter((item): item is DocumentSummary => item !== undefined)
-
-  function toggle(id: string) {
-    setSelectedIds((current) =>
-      current.includes(id) ? current.filter((item) => item !== id) : [...current, id],
-    )
-  }
-
-  function reorder(from: number, to: number) {
-    setSelectedIds((current) => {
-      if (to < 0 || to >= current.length) return current
-      const next = [...current]
-      const [moved] = next.splice(from, 1)
-      next.splice(to, 0, moved)
-      return next
-    })
-  }
+  const chosen = resolveSelection(selection.ids, pdfs)
 
   function reset() {
-    setSelectedIds([])
+    selection.clear()
     setOutputName('merged.pdf')
     merge.reset()
   }
@@ -83,8 +61,8 @@ export default function MergePage() {
           error={error}
           hasOnlyNonPdfs={hasOnlyNonPdfs}
           onRetry={() => void refetch()}
-          selected={selectedIds}
-          onToggle={toggle}
+          selected={selection.ids}
+          onToggle={selection.toggle}
         />
       </ToolStep>
 
@@ -93,10 +71,12 @@ export default function MergePage() {
         title="Put them in order"
         description="Drag a file, or use the arrows. The first one becomes page 1."
       >
-        <MergeOrder
+        <FileOrder
           documents={chosen}
-          onReorder={reorder}
-          onRemove={(id) => setSelectedIds((current) => current.filter((item) => item !== id))}
+          label="Merge order"
+          emptyMessage="Nothing chosen yet. Tick at least two PDFs above."
+          onReorder={selection.reorder}
+          onRemove={selection.remove}
         />
       </ToolStep>
 
@@ -132,7 +112,7 @@ export default function MergePage() {
           disabled={tooFew || tooMany || merge.isPending || outputName.trim().length === 0}
           onClick={() =>
             merge.mutate({
-              document_ids: selectedIds,
+              document_ids: selection.ids,
               output_name: outputName.trim(),
             })
           }

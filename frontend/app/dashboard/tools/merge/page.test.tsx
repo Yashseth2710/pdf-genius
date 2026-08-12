@@ -117,7 +117,7 @@ describe('Merge page', () => {
     await choose('cover.pdf')
     await choose('body.pdf')
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove cover.pdf from the merge' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove cover.pdf' }))
 
     expect(screen.getByRole('button', { name: /^Merge/ })).toBeDisabled()
   })

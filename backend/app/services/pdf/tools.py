@@ -21,14 +21,21 @@ from app.core.errors import ProcessingError
 from app.models import Document, ProcessingJob, User
 from app.models.enums import OperationType
 from app.services.files.service import DocumentService
-from app.services.files.validation import PDF
+from app.services.files.validation import EXTENSIONS, IMAGE_TYPES, PDF
 from app.services.jobs import JobService
-from app.services.pdf import operations
+from app.services.pdf import images, operations
+from app.services.pdf.compress import CompressionLevel, CompressionOutcome
+from app.services.pdf.compress import compress as compress_pdf
+from app.services.pdf.images import Orientation, PageSize, SourceImage
 from app.services.pdf.operations import OutputFile, PlannedPage, SourcePdf
 from app.services.pdf.ranges import parse_page_numbers, parse_page_ranges
 from app.services.storage.base import Storage
 
 logger = logging.getLogger(__name__)
+
+# The extension each accepted image type is opened as. Taken from the same
+# table the uploader names files with, so the two cannot drift apart.
+_IMAGE_EXTENSIONS = {mime: EXTENSIONS[mime] for mime in IMAGE_TYPES}
 
 
 @dataclass(frozen=True)
@@ -229,6 +236,112 @@ class ToolService:
             if planned.rotation % 90 != 0:
                 raise ProcessingError("Pages can only be turned in quarter turns.")
 
+    # --- Compress -------------------------------------------------------
+
+    def compress(
+        self, *, user: User, document_id: uuid.UUID, level: CompressionLevel
+    ) -> tuple[ToolResult, CompressionOutcome]:
+        """Make a PDF smaller, and report what that actually came to.
+
+        Returns no output document when the file could not be made meaningfully
+        smaller. The job still completes: it did everything it was asked to,
+        and the answer - that there is nothing left to take out - is a real
+        result rather than a failure. Storing a same-sized copy instead would
+        put a second, pointless document in the user's list and let us call it
+        a success.
+        """
+        document = self.documents.get_owned(document_id, user)
+        source = self._as_source(document)
+
+        job = self.jobs.start(
+            user=user,
+            operation=OperationType.COMPRESS,
+            document_id=document.id,
+            options={"level": level.value},
+        )
+        try:
+            outcome = compress_pdf(source, level)
+            stored = (
+                [self._store(user, outcome.output, filename=outcome.output.filename)]
+                if outcome.output is not None
+                else []
+            )
+        except Exception as exc:
+            self.jobs.fail_from(job, exc)
+            raise
+
+        self.jobs.complete(
+            job,
+            outputs=stored,
+            # Measured on the bytes that came out, never estimated from the
+            # level. Stored so a reload does not lose the only number that says
+            # whether this was worth doing.
+            result={
+                "original_size": outcome.original_size,
+                "final_size": outcome.final_size,
+                "saved_bytes": outcome.saved_bytes,
+                "saved_percent": round(outcome.saved_fraction * 100, 1),
+                "shrank": outcome.shrank,
+            },
+        )
+        return ToolResult(job=job, outputs=stored), outcome
+
+    # --- Convert --------------------------------------------------------
+
+    def images_to_pdf(
+        self,
+        *,
+        user: User,
+        document_ids: Sequence[uuid.UUID],
+        page_size: PageSize,
+        orientation: Orientation,
+        output_name: str,
+    ) -> ToolResult:
+        """Bind several images into one PDF, one page each, in the order given."""
+        if not document_ids:
+            raise ProcessingError("Choose at least one image.")
+
+        if len(document_ids) > self.settings.max_images_per_pdf:
+            raise ProcessingError(
+                f"You can combine up to {self.settings.max_images_per_pdf} images at once."
+            )
+
+        sources = [
+            self._as_image(self.documents.get_owned(document_id, user))
+            for document_id in document_ids
+        ]
+
+        total_bytes = sum(len(source.data) for source in sources)
+        if total_bytes > self.settings.max_images_total_bytes:
+            raise ProcessingError(
+                f"Those images come to more than {self.settings.max_images_total_mb}MB "
+                "together. Combine them in smaller batches."
+            )
+
+        job = self.jobs.start(
+            user=user,
+            operation=OperationType.CONVERT,
+            options={
+                "direction": "images_to_pdf",
+                "document_ids": [str(document_id) for document_id in document_ids],
+                "page_size": page_size.value,
+                "orientation": orientation.value,
+            },
+        )
+        try:
+            output = images.images_to_pdf(
+                sources,
+                page_size=page_size,
+                orientation=orientation,
+                output_name=output_name,
+            )
+            stored = self._store(user, output, filename=output_name)
+        except Exception as exc:
+            self.jobs.fail_from(job, exc)
+            raise
+
+        return self._finish(job, [stored])
+
     # --- Shared ---------------------------------------------------------
 
     def _load_pdfs(self, user: User, document_ids: Sequence[uuid.UUID]) -> list[SourcePdf]:
@@ -258,6 +371,22 @@ class ToolService:
                 f"'{document.original_filename}' is not a PDF. These tools work on PDFs only."
             )
         return SourcePdf(name=document.original_filename, data=self.documents.read_bytes(document))
+
+    def _as_image(self, document: Document) -> SourceImage:
+        """One of the user's documents as an image input.
+
+        The extension comes from the stored MIME type, which was decided at
+        upload by reading the file's leading bytes - never from the filename,
+        which the uploader chose.
+        """
+        extension = _IMAGE_EXTENSIONS.get(document.mime_type)
+        if extension is None:
+            raise ProcessingError(f"'{document.original_filename}' is not an image.")
+        return SourceImage(
+            name=document.original_filename,
+            data=self.documents.read_bytes(document),
+            extension=extension,
+        )
 
     def _page_count(self, document: Document, source: SourcePdf) -> int:
         """The page count, preferring the stored one but never trusting it blindly.

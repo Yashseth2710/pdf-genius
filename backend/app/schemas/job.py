@@ -25,6 +25,10 @@ class JobResponse(BaseModel):
     document_id: uuid.UUID | None
     output_document_ids: list[uuid.UUID]
     options: dict[str, Any] = Field(validation_alias="input_metadata")
+    # What the run turned out to be, as opposed to what it was asked to do:
+    # the measured sizes a compression achieved, for instance. Empty for the
+    # operations that have nothing to report beyond the files they made.
+    result: dict[str, Any] = Field(validation_alias="result_metadata")
     error_message: str | None
     created_at: datetime
     completed_at: datetime | None
@@ -82,6 +86,30 @@ class OrganiseRequest(BaseModel):
     document_id: uuid.UUID
     pages: list[PlannedPageRequest] = Field(min_length=1, max_length=500)
     output_name: str | None = Field(default=None, max_length=200)
+
+
+class CompressRequest(BaseModel):
+    """How hard to try. What that achieves is only known afterwards."""
+
+    document_id: uuid.UUID
+    level: Literal["basic", "balanced", "strong"] = "balanced"
+
+
+class ImagesToPdfRequest(BaseModel):
+    """Images to bind into one PDF, in the order they are listed.
+
+    The order is the payload's: it is what the user dragged the thumbnails
+    into, and sorting it here would silently ignore them.
+    """
+
+    document_ids: list[uuid.UUID] = Field(min_length=1, max_length=50)
+    # "match" gives each page the size of its own image, which is what someone
+    # assembling scans that are already the right shape wants.
+    page_size: Literal["a4", "letter", "match"] = "a4"
+    # "auto" lets each page follow its own image, so a mixed batch of photos
+    # does not put the landscape ones in a portrait letterbox.
+    orientation: Literal["portrait", "landscape", "auto"] = "auto"
+    output_name: str = Field(default="images.pdf", min_length=1, max_length=200)
 
 
 class SplitRequest(BaseModel):

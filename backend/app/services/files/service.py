@@ -27,6 +27,22 @@ from app.services.storage.local import FileTooLargeInStorage
 logger = logging.getLogger(__name__)
 
 
+def _accepted(mime_types: Sequence[str]) -> str:
+    """The accepted types, written out for the person who just guessed wrong.
+
+    Built from the list actually in force rather than written as a sentence,
+    because the two drift: the setting can be narrowed by an environment
+    variable, and a message that names formats the server then refuses is worse
+    than one that names none. This one cannot be wrong.
+    """
+    names = [EXTENSIONS[mime].upper() for mime in mime_types if mime in EXTENSIONS]
+    if not names:
+        return "a supported file"
+    if len(names) == 1:
+        return f"a {names[0]}"
+    return f"a {', '.join(names[:-1])} or {names[-1]}"
+
+
 class DocumentService:
     def __init__(self, db: Session, storage: Storage) -> None:
         self.db = db
@@ -56,7 +72,7 @@ class DocumentService:
             # both are supplied by the uploader. A .exe renamed to .pdf is
             # rejected here.
             raise UnsupportedFileTypeError(
-                "That file type is not supported. Upload a PDF, JPG or PNG."
+                f"That file type is not supported. Upload {_accepted(allowed_mime_types)}."
             )
 
         key = new_document_key(user.id, file_type.extension)

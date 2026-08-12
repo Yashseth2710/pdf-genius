@@ -31,11 +31,16 @@ class SourcePdf:
 
 @dataclass(frozen=True)
 class OutputFile:
-    """One produced file, named as the user will see it."""
+    """One produced file, named as the user will see it.
+
+    ``page_count`` is ``None`` for a file that has no pages to count - a page
+    exported as a JPG is a result like any other, but "1 page" would be a
+    number we invented.
+    """
 
     filename: str
     data: bytes
-    page_count: int
+    page_count: int | None = None
 
 
 def open_pdf(source: SourcePdf) -> pymupdf.Document:

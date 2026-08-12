@@ -12,10 +12,22 @@ import { cn } from '@/lib/utils'
 import type { DocumentSummary } from '@/types/api'
 
 const MAX_BYTES = 25 * 1024 * 1024
+/**
+ * What the file dialog offers, matching what the server accepts.
+ *
+ * This is a convenience for the file picker, not a check: the browser matches
+ * on extension and declared type, both of which the uploader controls. The
+ * server decides what a file really is by reading its leading bytes.
+ */
 const ACCEPTED = {
   'application/pdf': ['.pdf'],
   'image/jpeg': ['.jpg', '.jpeg'],
   'image/png': ['.png'],
+  'image/gif': ['.gif'],
+  'image/bmp': ['.bmp'],
+  'image/tiff': ['.tif', '.tiff'],
+  'image/webp': ['.webp'],
+  'image/heic': ['.heic', '.heif'],
 }
 
 interface Upload {
@@ -97,7 +109,8 @@ export function UploadZone({ onUploaded }: { onUploaded: (document: DocumentSumm
           {isDragActive ? 'Drop them here' : 'Drag files here, or click to choose'}
         </p>
         <p className="text-muted-foreground mt-1 text-sm">
-          PDF, JPG or PNG — up to {formatBytes(MAX_BYTES)} each
+          PDF, or JPG, PNG, GIF, BMP, TIFF, WEBP and HEIC images — up to {formatBytes(MAX_BYTES)}{' '}
+          each
         </p>
       </div>
 

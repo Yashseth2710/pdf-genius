@@ -14,5 +14,11 @@ export default defineConfig({
     // under e2e/ and must not be picked up by Vitest.
     include: ['**/*.test.{ts,tsx}'],
     exclude: ['node_modules/**', '.next/**', 'e2e/**'],
+    // Well above what any of these needs, and deliberately so. A page test
+    // drives Base UI through real user events in jsdom, which takes a second
+    // or two on an idle machine and several on a busy one - so the default
+    // five seconds fails tests that are working perfectly. A timeout is there
+    // to catch a hang, not to measure how loaded the machine is.
+    testTimeout: 20_000,
   },
 })

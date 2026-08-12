@@ -51,7 +51,11 @@ class Settings(BaseSettings):
     storage_provider: str = "local"
     storage_root: Path = Path("./storage")
     max_upload_size_mb: int = 25
-    allowed_upload_types: str = "application/pdf,image/jpeg,image/png"
+    # Every image type the established converters take, so somebody arriving
+    # with a phone photo or a scan is not turned away over a container format.
+    allowed_upload_types: str = (
+        "application/pdf,image/jpeg,image/png,image/gif,image/bmp,image/tiff,image/webp,image/heic"
+    )
 
     # --- Processing limits ---
     # PyMuPDF does its work in memory, so these caps are what stand between a
@@ -64,6 +68,8 @@ class Settings(BaseSettings):
     # want - so the organiser is capped on the size of the result, not on the
     # size of the original.
     max_organise_pages: int = 500
+    max_images_per_pdf: int = 50
+    max_images_total_mb: int = 100
 
     # --- Retention ---
     output_retention_hours: int = 24
@@ -104,6 +110,10 @@ class Settings(BaseSettings):
     @property
     def max_merge_total_bytes(self) -> int:
         return self.max_merge_total_mb * 1024 * 1024
+
+    @property
+    def max_images_total_bytes(self) -> int:
+        return self.max_images_total_mb * 1024 * 1024
 
     @property
     def is_production(self) -> bool:

@@ -7,6 +7,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 
 import { PreviewButton } from '@/components/tools/preview-button'
+import { canPreviewInBrowser } from '@/components/tools/use-documents'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ApiError } from '@/lib/api'
@@ -181,8 +182,15 @@ function DocumentRow({
 
       {/* The icons carry an aria-label for screen readers; the tooltip is what
           tells a sighted user what the icon does before they click it. */}
-      {document.mime_type === 'application/pdf' && (
-        <PreviewButton documentId={document.id} filename={document.original_filename} />
+      {/* PDFs and images both have a viewer now. TIFF and HEIC are the
+          exceptions: they convert fine, but no browser outside Safari will
+          draw one, so offering a preview would open an empty box. */}
+      {canPreviewInBrowser(document.mime_type) && (
+        <PreviewButton
+          documentId={document.id}
+          filename={document.original_filename}
+          mimeType={document.mime_type}
+        />
       )}
 
       <Tooltip>

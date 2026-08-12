@@ -128,7 +128,11 @@ function ResultRow({ output }: { output: DocumentSummary }) {
         </p>
       </div>
 
-      <PreviewButton documentId={output.id} filename={output.original_filename} />
+      <PreviewButton
+        documentId={output.id}
+        filename={output.original_filename}
+        mimeType={output.mime_type}
+      />
 
       <Tooltip>
         <TooltipTrigger
