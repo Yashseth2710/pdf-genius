@@ -10,6 +10,8 @@ import { toast } from 'sonner'
 import { BackLink } from '@/components/shared/back-link'
 import { PageThumbnail } from '@/components/tools/page-thumbnail'
 import { PageViewer } from '@/components/tools/page-viewer'
+import { canPreviewInBrowser } from '@/components/tools/use-documents'
+import { useImageSource } from '@/components/tools/use-image-source'
 import { usePdfDocument } from '@/components/tools/use-pdf-document'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { ApiError } from '@/lib/api'
@@ -37,12 +39,16 @@ export default function DocumentPreviewPage() {
   })
 
   const isPdf = details.data?.mime_type === 'application/pdf'
+  // Only the ones a browser will draw. A TIFF or a HEIC converts perfectly
+  // well; it is showing one here that no browser outside Safari will do.
+  const isImage = canPreviewInBrowser(details.data?.mime_type ?? '') && !isPdf
   const {
     document: pdf,
     pageCount,
     isLoading,
     error: openError,
   } = usePdfDocument(isPdf ? documentId : null)
+  const { url: imageUrl, error: imageError } = useImageSource(isImage ? documentId : null)
 
   async function handleDownload() {
     if (!details.data) return
@@ -123,11 +129,34 @@ export default function DocumentPreviewPage() {
         </div>
       </div>
 
-      {!isPdf && (
+      {isImage && (
+        <div className="bg-muted/40 flex justify-center rounded-lg p-4">
+          {imageError ? (
+            <p className="text-destructive py-16 text-sm" role="alert">
+              {imageError}
+            </p>
+          ) : imageUrl ? (
+            // A blob URL of the user's own file, which next/image cannot fetch
+            // to optimise.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={imageUrl}
+              alt={document.original_filename}
+              className="max-h-[70vh] rounded object-contain shadow-sm"
+            />
+          ) : (
+            <Loader2 className="text-muted-foreground my-16 size-6 animate-spin" aria-hidden />
+          )}
+        </div>
+      )}
+
+      {!isPdf && !isImage && (
         <p className="text-muted-foreground rounded-lg border border-dashed px-6 py-10 text-center text-sm">
           {document.mime_type === 'application/zip'
             ? 'This is an archive. Download it to see what is inside.'
-            : 'Only PDFs can be previewed here. Download the file to open it.'}
+            : document.mime_type.startsWith('image/')
+              ? 'No browser can display this kind of image, so it cannot be shown here — but it converts to PDF perfectly well. Download it to open it.'
+              : 'This kind of file cannot be shown here. Download it to open it.'}
         </p>
       )}
 

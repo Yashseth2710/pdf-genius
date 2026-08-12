@@ -56,14 +56,27 @@ class JobService:
         self.db.commit()
         return job
 
-    def complete(self, job: ProcessingJob, *, outputs: Sequence[Document]) -> ProcessingJob:
+    def complete(
+        self,
+        job: ProcessingJob,
+        *,
+        outputs: Sequence[Document],
+        result: dict[str, Any] | None = None,
+    ) -> ProcessingJob:
         """Mark a job done and record what it produced, in order.
 
         The order matters: for a split it is the order the ranges were asked
         for, and that is how the results are listed back to the user.
+
+        ``result`` is for what the work revealed rather than what was asked
+        for - the measured size a compression achieved, for instance. A job
+        with no outputs is still a completed job: compressing a document that
+        was already as small as it goes did everything it was asked to.
         """
         job.status = JobStatus.COMPLETED
         job.output_document_ids = [str(document.id) for document in outputs]
+        if result is not None:
+            job.result_metadata = result
         job.completed_at = datetime.now(UTC)
         self.db.commit()
         logger.info("Job id=%s %s completed with %d output(s)", job.id, job.operation, len(outputs))

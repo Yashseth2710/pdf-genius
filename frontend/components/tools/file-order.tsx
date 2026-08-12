@@ -25,18 +25,27 @@ import { cn } from '@/lib/utils'
 import type { DocumentSummary } from '@/types/api'
 
 /**
- * The chosen files, in the order they will be merged.
+ * The chosen files, in the order they will be used.
  *
  * Dragging is the obvious way to reorder with a mouse, but it is a poor one
  * with a keyboard or a screen reader, so every row also carries move-up and
  * move-down buttons. Both paths change the same array.
+ *
+ * Shared by merging and by binding images into a PDF, because they are the
+ * same question — which of these files comes first — and the answer should not
+ * look or behave differently depending on which screen asked it.
  */
-export function MergeOrder({
+export function FileOrder({
   documents,
+  label,
+  emptyMessage,
   onReorder,
   onRemove,
 }: {
   documents: DocumentSummary[]
+  /** Names the list for screen readers, e.g. "Merge order". */
+  label: string
+  emptyMessage: string
   onReorder: (from: number, to: number) => void
   onRemove: (id: string) => void
 }) {
@@ -61,7 +70,7 @@ export function MergeOrder({
   if (documents.length === 0) {
     return (
       <p className="text-muted-foreground rounded-lg border border-dashed px-4 py-6 text-center text-sm">
-        Nothing chosen yet. Tick at least two PDFs above.
+        {emptyMessage}
       </p>
     )
   }
@@ -77,7 +86,7 @@ export function MergeOrder({
         items={documents.map((item) => item.id)}
         strategy={verticalListSortingStrategy}
       >
-        <ol className="space-y-2" aria-label="Merge order">
+        <ol className="space-y-2" aria-label={label}>
           {documents.map((document, index) => (
             <SortableRow
               key={document.id}
@@ -180,7 +189,7 @@ function SortableRow({
               className="text-muted-foreground hover:text-destructive"
             />
           }
-          aria-label={`Remove ${document.original_filename} from the merge`}
+          aria-label={`Remove ${document.original_filename}`}
         >
           <X aria-hidden />
         </TooltipTrigger>

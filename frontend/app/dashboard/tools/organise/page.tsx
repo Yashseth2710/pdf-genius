@@ -4,10 +4,10 @@ import { Loader2 } from 'lucide-react'
 import { useState } from 'react'
 
 import { PageOrganiser } from '@/components/tools/page-organiser'
-import { PdfSingleSelect } from '@/components/tools/pdf-picker'
+import { PdfSingleSelect } from '@/components/tools/document-picker'
 import { ToolShell, ToolStep } from '@/components/tools/tool-shell'
 import { usePdfDocument } from '@/components/tools/use-pdf-document'
-import { usePdfDocuments } from '@/components/tools/use-pdfs'
+import { usePdfDocuments } from '@/components/tools/use-documents'
 
 export default function OrganisePage() {
   const { pdfs, isPending, isError, error, hasOnlyNonPdfs, refetch } = usePdfDocuments()

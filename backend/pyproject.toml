@@ -41,7 +41,7 @@ exclude = ["\\.venv", "migrations/versions"]
 
 [[tool.mypy.overrides]]
 # Third-party packages that ship no type information.
-module = ["slowapi.*", "pdfplumber.*", "fitz.*", "pymupdf.*"]
+module = ["slowapi.*", "pdfplumber.*", "fitz.*", "pymupdf.*", "pillow_heif.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]
@@ -53,6 +53,8 @@ module = [
     "app.services.pdf.*",
     # The tests build real PDFs to work on, so they call the same untyped API.
     "tests.test_pdf_operations",
+    "tests.test_pdf_compress",
+    "tests.test_pdf_images",
     "tests.integration.test_documents_api",
     "tests.integration.test_tools_api",
 ]

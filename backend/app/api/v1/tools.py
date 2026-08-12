@@ -1,4 +1,4 @@
-"""The PDF tools: merge, organise and split.
+"""The PDF tools: merge, organise, split, compress and convert.
 
 All of them run inside the request. See ``app/services/jobs/service.py`` for
 why there is no worker behind them.
@@ -13,12 +13,16 @@ from app.core.rate_limit import limiter
 from app.schemas.common import SuccessResponse
 from app.schemas.document import DocumentResponse
 from app.schemas.job import (
+    CompressRequest,
+    ImagesToPdfRequest,
     JobResponse,
     MergeRequest,
     OrganiseRequest,
     SplitRequest,
     ToolRunResponse,
 )
+from app.services.pdf.compress import CompressionLevel
+from app.services.pdf.images import Orientation, PageSize
 from app.services.pdf.operations import PlannedPage
 from app.services.pdf.tools import ToolResult, ToolService
 
@@ -80,6 +84,59 @@ def organise_document(
         user=current_user,
         document_id=payload.document_id,
         plan=[PlannedPage(number=page.number, rotation=page.rotation) for page in payload.pages],
+        output_name=payload.output_name,
+    )
+    return _response(result)
+
+
+@router.post(
+    "/compress",
+    response_model=SuccessResponse[ToolRunResponse],
+    summary="Make a PDF smaller",
+)
+@limiter.limit(settings.rate_limit_processing)
+def compress_document(
+    request: Request,
+    payload: CompressRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+    storage: StorageDep,
+) -> SuccessResponse[ToolRunResponse]:
+    """Compress a PDF and report the size it actually reached.
+
+    A run that could not make the file meaningfully smaller comes back with no
+    outputs and the measurements on the job. That is a completed job, not a
+    failed one: the work was done and the answer is that there was nothing left
+    to take out.
+    """
+    service = ToolService(db, storage, settings)
+    result, _ = service.compress(
+        user=current_user,
+        document_id=payload.document_id,
+        level=CompressionLevel(payload.level),
+    )
+    return _response(result)
+
+
+@router.post(
+    "/images-to-pdf",
+    response_model=SuccessResponse[ToolRunResponse],
+    summary="Combine images into one PDF",
+)
+@limiter.limit(settings.rate_limit_processing)
+def images_to_pdf(
+    request: Request,
+    payload: ImagesToPdfRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+    storage: StorageDep,
+) -> SuccessResponse[ToolRunResponse]:
+    service = ToolService(db, storage, settings)
+    result = service.images_to_pdf(
+        user=current_user,
+        document_ids=payload.document_ids,
+        page_size=PageSize(payload.page_size),
+        orientation=Orientation(payload.orientation),
         output_name=payload.output_name,
     )
     return _response(result)

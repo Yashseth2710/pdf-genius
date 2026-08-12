@@ -92,6 +92,16 @@ export function uploadDocument(
  * browser saves it under the filename the server chose.
  */
 export async function downloadDocument(id: string, filename: string): Promise<void> {
+  await saveBlob(await fetchDocumentBlob(id), filename)
+}
+
+/**
+ * The bytes of a stored document.
+ *
+ * Fetched rather than linked to, because the endpoint needs an Authorization
+ * header — an `<img src>` or an `<a href>` would be sent without one.
+ */
+export async function fetchDocumentBlob(id: string): Promise<Blob> {
   const response = await fetch(`${API_URL}/documents/${id}/download`, {
     headers: authHeader(),
   })
@@ -100,7 +110,7 @@ export async function downloadDocument(id: string, filename: string): Promise<vo
     throw new ApiError('DOWNLOAD_FAILED', 'That file could not be downloaded.', response.status)
   }
 
-  await saveBlob(await response.blob(), filename)
+  return response.blob()
 }
 
 /**

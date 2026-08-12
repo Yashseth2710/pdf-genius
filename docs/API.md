@@ -125,7 +125,12 @@ All of these require a token, and every one is scoped to the signed-in user.
 
 `multipart/form-data` with a single `file` field. Rate limited to 30 a minute.
 
-Accepts PDF, JPG and PNG up to `MAX_UPLOAD_SIZE_MB` (25 by default).
+Accepts PDF, and images as JPG, PNG, GIF, BMP, TIFF, WEBP or HEIC, up to
+`MAX_UPLOAD_SIZE_MB` (25 by default).
+
+The image list matches what the established converters take. HEIC matters most
+of all: it is what an iPhone writes by default, so refusing it would turn away
+the commonest photo there is over a container format.
 
 ```jsonc
 // 201
@@ -151,7 +156,7 @@ nothing is left on disk in either case.
 
 | Failure | Status | Code |
 | --- | --- | --- |
-| Not a PDF/JPG/PNG | 415 | `UNSUPPORTED_FILE_TYPE` |
+| Not one of the accepted types | 415 | `UNSUPPORTED_FILE_TYPE` |
 | Corrupt, empty or password-protected PDF | 422 | `INVALID_FILE` |
 | Over the size limit | 413 | `FILE_TOO_LARGE` |
 
@@ -203,7 +208,7 @@ Removes the record, then the file.
 
 ## Tools
 
-Both tools run **inside the request**. A merge of a handful of PDFs finishes in
+Every tool runs **inside the request**. A merge of a handful of PDFs finishes in
 well under a second, and a queue would mean Redis or Celery — a running cost
 and a second process, for work that is already fast. A `ProcessingJob` row is
 still written for every run, so history works and moving to a queue later
@@ -323,6 +328,85 @@ All of these return **422** with code `INVALID_PAGE_RANGE`. Splitting a
 one-page document with `every_page`, or asking for more than 100 output files,
 returns 422 with `PROCESSING_FAILED`.
 
+### `POST /tools/compress`
+
+```jsonc
+{ "document_id": "8c1f...", "level": "balanced" }
+```
+
+`level` is `basic`, `balanced` or `strong`, defaulting to `balanced`.
+
+| level | what it does |
+| --- | --- |
+| `basic` | Lossless: collects unused objects, deflates streams. Nothing in the file changes. |
+| `balanced` | Redraws images above 200 DPI down to 150 at quality 80. |
+| `strong` | Redraws images above 130 DPI down to 96 at quality 55. |
+
+**Text and vector drawings are never touched, at any level**, and neither are
+1-bit images — a bitonal image in a PDF is almost always scanned text.
+
+The result is on the **job**, measured after the work:
+
+```jsonc
+{
+  "job": {
+    "operation": "COMPRESS",
+    "status": "COMPLETED",
+    "result": {
+      "original_size": 4194304, "final_size": 1048576,
+      "saved_bytes": 3145728, "saved_percent": 75.0, "shrank": true
+    }
+  },
+  "outputs": [ { "original_filename": "scan-compressed.pdf", "…": "…" } ]
+}
+```
+
+**A run that cannot make the file smaller returns `"shrank": false` and an
+empty `outputs`.** The job still completed: it did what it was asked and found
+nothing left to take out. Nothing is saved, because a same-sized copy in the
+user's documents is clutter, not a result. To count as smaller the file must
+lose at least 1% *and* at least 10KB — a percentage alone calls 70 bytes off a
+tiny file a 5% success, and a byte count alone calls 40KB off a 200MB scan a win.
+
+There is deliberately no way to ask how small a file *would* get. The same
+level takes 90% off a photographed scan and nothing off a page of text, and
+the only honest way to know which is which is to do the work.
+
+### `POST /tools/images-to-pdf`
+
+```jsonc
+{
+  "document_ids": ["8c1f...", "3a90..."],
+  "page_size": "a4",
+  "orientation": "auto",
+  "output_name": "album.pdf"
+}
+```
+
+One to fifty images — JPG, PNG, GIF, BMP, TIFF, WEBP or HEIC — one page each.
+**The order of `document_ids` is the order of the pages**, as with merge.
+
+WEBP and HEIC are decoded by Pillow on the way in, because the PDF library
+cannot read either; the rest go straight through untouched. A decoded image is
+re-encoded as PNG when it has transparency and JPEG when it does not — JPEG has
+no alpha channel, and flattening a cut-out onto black is a silent way to ruin
+one.
+
+| `page_size` | |
+| --- | --- |
+| `a4` / `letter` | Each image is fitted whole onto the page, centred, never stretched. |
+| `match` | Each page is exactly its image — no borders, nothing cropped. |
+
+`orientation` is `portrait`, `landscape` or `auto` (each page follows its own
+image, so a mixed batch does not letterbox the landscape ones). It is ignored
+when `page_size` is `match`.
+
+| Failure | Status | Code |
+| --- | --- | --- |
+| A document is not an image | 422 | `PROCESSING_FAILED` |
+| More than 50 images, or over 100MB together | 422 | `PROCESSING_FAILED` |
+| A document is not yours, or does not exist | 404 | `NOT_FOUND` |
+
 ## Jobs
 
 ### `GET /jobs?limit=20&offset=0&operation=MERGE`
@@ -340,6 +424,7 @@ Your processing history, newest first. `operation` is optional.
         "status": "COMPLETED",
         "document_id": "8c1f...",
         "options": { "mode": "ranges", "ranges": "1-3, 5" },
+        "result": { },
         "error_message": null,
         "created_at": "2026-08-11T21:04:00Z",
         "completed_at": "2026-08-11T21:04:01Z"
@@ -354,6 +439,16 @@ Your processing history, newest first. `operation` is optional.
 inputs are recorded in `options` instead. `output_document_ids` names what came
 out, in order. As with documents, **no storage path is ever returned**: results
 are reached by document id.
+
+`options` is what the job was *asked* to do; `result` is what the work turned
+out to be, and is empty for the operations with nothing to report beyond the
+files they made. Compression is why it exists: the measured sizes have to
+outlive the response that first reported them, or reloading loses the only
+number that says whether the run was worth anything.
+
+Conversion is recorded as `CONVERT`, with `options.direction` naming which
+way it went — `images_to_pdf` today, and room for the reverse if it is ever
+added back.
 
 ### `GET /jobs/{id}`
 
@@ -379,5 +474,4 @@ the database cannot be reached.
 
 ## Coming in later scopes
 
-`/tools/compress`, `/tools/convert`, `/tools/rotate`, `/tools/watermark` and
-`/ai/*` — see [ROADMAP.md](ROADMAP.md).
+`/tools/watermark` and `/ai/*` — see [ROADMAP.md](ROADMAP.md).

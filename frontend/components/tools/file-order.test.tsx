@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 
-import { MergeOrder } from '@/components/tools/merge-order'
+import { FileOrder } from '@/components/tools/file-order'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import type { DocumentSummary } from '@/types/api'
 
@@ -20,18 +20,25 @@ function doc(id: string, name: string): DocumentSummary {
 
 const documents = [doc('a', 'cover.pdf'), doc('b', 'body.pdf'), doc('c', 'appendix.pdf')]
 
-function renderOrder(overrides: Partial<Parameters<typeof MergeOrder>[0]> = {}) {
+function renderOrder(overrides: Partial<Parameters<typeof FileOrder>[0]> = {}) {
   const onReorder = vi.fn()
   const onRemove = vi.fn()
   render(
     <TooltipProvider delay={0}>
-      <MergeOrder documents={documents} onReorder={onReorder} onRemove={onRemove} {...overrides} />
+      <FileOrder
+        documents={documents}
+        label="Merge order"
+        emptyMessage="Nothing chosen yet. Tick at least two PDFs above."
+        onReorder={onReorder}
+        onRemove={onRemove}
+        {...overrides}
+      />
     </TooltipProvider>,
   )
   return { onReorder, onRemove }
 }
 
-describe('MergeOrder', () => {
+describe('FileOrder', () => {
   it('numbers the files so the resulting order is visible', () => {
     renderOrder()
 
@@ -73,9 +80,23 @@ describe('MergeOrder', () => {
   it('removes the file the button belongs to', async () => {
     const { onRemove } = renderOrder()
 
-    await userEvent.click(screen.getByRole('button', { name: 'Remove body.pdf from the merge' }))
+    await userEvent.click(screen.getByRole('button', { name: 'Remove body.pdf' }))
 
     expect(onRemove).toHaveBeenCalledWith('b')
+  })
+
+  it('is named by whatever is using it, so two lists are not both "list"', () => {
+    // Merge and images-to-PDF both render this. An unnamed list would leave a
+    // screen reader - and a test - unable to say which one it had found.
+    renderOrder({ label: 'Page order' })
+
+    expect(screen.getByRole('list', { name: 'Page order' })).toBeInTheDocument()
+  })
+
+  it('takes its empty message from the tool, which knows how many are needed', () => {
+    renderOrder({ documents: [], emptyMessage: 'Nothing chosen yet. Tick at least one image.' })
+
+    expect(screen.getByText(/tick at least one image/i)).toBeInTheDocument()
   })
 
   it('offers a keyboard route to reordering, not only dragging', () => {

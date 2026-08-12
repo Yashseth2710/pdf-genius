@@ -70,7 +70,30 @@ export interface DocumentListPage {
 export type JobStatus = 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 
 export type OperationType =
-  'MERGE' | 'SPLIT' | 'COMPRESS' | 'CONVERT' | 'ROTATE' | 'EXTRACT' | 'WATERMARK' | 'OCR'
+  | 'MERGE'
+  | 'SPLIT'
+  | 'ORGANISE'
+  | 'COMPRESS'
+  | 'CONVERT'
+  | 'ROTATE'
+  | 'EXTRACT'
+  | 'WATERMARK'
+  | 'OCR'
+
+/**
+ * What compressing a document actually came to.
+ *
+ * Measured after the work, never predicted from the level: the same setting
+ * takes 90% off a photographed scan and nothing at all off a text document.
+ */
+export interface CompressionResult {
+  original_size: number
+  final_size: number
+  saved_bytes: number
+  saved_percent: number
+  /** False when the file could not be made meaningfully smaller. */
+  shrank: boolean
+}
 
 /** A record of one operation. Results are named by document id. */
 export interface Job {
@@ -80,6 +103,8 @@ export interface Job {
   document_id: string | null
   output_document_ids: string[]
   options: Record<string, unknown>
+  /** What the run turned out to be, as opposed to what it was asked to do. */
+  result: Record<string, unknown>
   /** Written for the user, never a stack trace. */
   error_message: string | null
   created_at: string
@@ -125,6 +150,24 @@ export interface SplitInput {
   ranges?: string
   /** For mode "pages": 1-based page numbers. */
   pages?: number[]
+}
+
+export type CompressionLevel = 'basic' | 'balanced' | 'strong'
+
+export interface CompressInput {
+  document_id: string
+  level: CompressionLevel
+}
+
+export type PageSize = 'a4' | 'letter' | 'match'
+export type Orientation = 'portrait' | 'landscape' | 'auto'
+
+export interface ImagesToPdfInput {
+  /** In the order the pages should come out. */
+  document_ids: string[]
+  page_size: PageSize
+  orientation: Orientation
+  output_name?: string
 }
 
 export interface RegisterInput {

@@ -1,4 +1,4 @@
-import { Combine, LayoutGrid, Scissors } from 'lucide-react'
+import { Combine, FileOutput, LayoutGrid, Minimize2, Scissors } from 'lucide-react'
 import Link from 'next/link'
 import type { Metadata } from 'next'
 
@@ -33,6 +33,18 @@ const TOOLS = [
     icon: LayoutGrid,
     title: 'Organise pages',
     description: 'See every page, then turn, reorder or remove the ones you want.',
+  },
+  {
+    href: '/dashboard/tools/compress',
+    icon: Minimize2,
+    title: 'Compress a PDF',
+    description: 'Make a PDF smaller, and see exactly how much smaller it got.',
+  },
+  {
+    href: '/dashboard/tools/images-to-pdf',
+    icon: FileOutput,
+    title: 'Images to PDF',
+    description: 'Turn photos and scans into one PDF, a page each, in your order.',
   },
 ]
 

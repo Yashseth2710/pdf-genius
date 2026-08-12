@@ -61,6 +61,13 @@ class ProcessingJob(UUIDPrimaryKey, Timestamps, Base):
     # as ordinary documents and zipped only if someone asks to download them
     # all at once.
     output_document_ids: Mapped[list[str]] = mapped_column(JSONB, default=list, nullable=False)
+
+    # What the job found out by doing the work, as opposed to what it was asked
+    # to do. Compression is the reason this exists: the only honest way to know
+    # how much smaller a PDF got is to compress it and measure, and that number
+    # has to outlive the response that first reported it, or reloading the page
+    # loses it. History in a later scope reads the same field.
+    result_metadata: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict, nullable=False)
     # The reason a job failed, phrased for the user. Never a stack trace.
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

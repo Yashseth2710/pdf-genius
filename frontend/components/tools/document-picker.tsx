@@ -1,9 +1,10 @@
 'use client'
 
-import { FileText } from 'lucide-react'
+import { FileText, Image as ImageIcon } from 'lucide-react'
 import Link from 'next/link'
 
 import { PreviewButton } from '@/components/tools/preview-button'
+import { canPreviewInBrowser } from '@/components/tools/use-documents'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
@@ -13,6 +14,39 @@ import { cn } from '@/lib/utils'
 import type { DocumentSummary } from '@/types/api'
 
 /**
+ * What a picker is choosing between.
+ *
+ * Only the words and the icon differ, so the two kinds share one
+ * implementation: "no PDFs yet" and "no images yet" are the same screen with a
+ * different noun, and writing them twice is how they drift apart.
+ */
+type Kind = 'pdf' | 'image'
+
+const WORDING = {
+  pdf: {
+    icon: FileText,
+    one: 'PDF',
+    emptyTitle: 'No PDFs yet',
+    emptyOthers: 'These tools work on PDFs, and none of your documents is one.',
+    emptyNone: 'Upload a PDF and it will show up here.',
+    upload: 'Upload a PDF',
+    loading: 'Loading your PDFs',
+    chooseOne: 'Choose a PDF',
+  },
+  image: {
+    icon: ImageIcon,
+    one: 'image',
+    emptyTitle: 'No images yet',
+    emptyOthers: 'This tool works on images, and none of your documents is one.',
+    emptyNone:
+      'Upload an image — JPG, PNG, GIF, BMP, TIFF, WEBP or HEIC — and it will show up here.',
+    upload: 'Upload an image',
+    loading: 'Loading your images',
+    chooseOne: 'Choose an image',
+  },
+} as const
+
+/**
  * The loading, empty and error states every picker shares.
  *
  * A plain function rather than a component, and deliberately lowercase: the
@@ -20,23 +54,27 @@ import type { DocumentSummary } from '@/types/api'
  * element is always truthy, so `<Placeholder />` could never answer that.
  */
 function pickerPlaceholder({
+  kind,
   isPending,
   isError,
   error,
   isEmpty,
-  hasOnlyNonPdfs,
+  hasOnlyOtherTypes,
   onRetry,
 }: {
+  kind: Kind
   isPending: boolean
   isError: boolean
   error: unknown
   isEmpty: boolean
-  hasOnlyNonPdfs: boolean
+  hasOnlyOtherTypes: boolean
   onRetry: () => void
 }): React.ReactNode | null {
+  const words = WORDING[kind]
+
   if (isPending) {
     return (
-      <ul className="space-y-2" aria-busy="true" aria-label="Loading your PDFs">
+      <ul className="space-y-2" aria-busy="true" aria-label={words.loading}>
         {[0, 1, 2].map((row) => (
           <li key={row} className="bg-muted/50 h-[58px] animate-pulse rounded-lg" />
         ))}
@@ -61,17 +99,17 @@ function pickerPlaceholder({
   if (isEmpty) {
     return (
       <div className="rounded-lg border border-dashed px-6 py-10 text-center">
-        <p className="font-medium">{hasOnlyNonPdfs ? 'No PDFs yet' : 'Nothing to work with yet'}</p>
+        <p className="font-medium">
+          {hasOnlyOtherTypes ? words.emptyTitle : 'Nothing to work with yet'}
+        </p>
         <p className="text-muted-foreground mt-1 text-sm">
-          {hasOnlyNonPdfs
-            ? 'These tools work on PDFs, and none of your documents is one.'
-            : 'Upload a PDF and it will show up here.'}
+          {hasOnlyOtherTypes ? words.emptyOthers : words.emptyNone}
         </p>
         <Link
           href="/dashboard"
           className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'mt-4')}
         >
-          Upload a PDF
+          {words.upload}
         </Link>
       </div>
     )
@@ -98,9 +136,15 @@ function meta(document: DocumentSummary): string {
 export function PdfSingleSelect({
   value,
   onChange,
+  hasOnlyNonPdfs,
   ...state
 }: PickerProps & { value: string | null; onChange: (id: string) => void }) {
-  const placeholder = pickerPlaceholder({ ...state, isEmpty: state.documents.length === 0 })
+  const placeholder = pickerPlaceholder({
+    ...state,
+    kind: 'pdf',
+    hasOnlyOtherTypes: hasOnlyNonPdfs,
+    isEmpty: state.documents.length === 0,
+  })
   if (placeholder !== null) return placeholder
 
   return (
@@ -129,7 +173,11 @@ export function PdfSingleSelect({
           </span>
           {/* Checking you picked the right file should not mean leaving the
               tool and coming back. */}
-          <PreviewButton documentId={document.id} filename={document.original_filename} />
+          <PreviewButton
+            documentId={document.id}
+            filename={document.original_filename}
+            mimeType={document.mime_type}
+          />
         </label>
       ))}
     </RadioGroup>
@@ -137,18 +185,32 @@ export function PdfSingleSelect({
 }
 
 /**
- * Choose any number of PDFs.
+ * Choose any number of documents of one kind.
  *
  * Ticking a file appends it to the selection rather than inserting it by list
  * position, so the order the user builds up is the order they get.
  */
-export function PdfMultiSelect({
+function MultiSelect({
+  kind,
   selected,
   onToggle,
+  hasOnlyOtherTypes,
   ...state
-}: PickerProps & { selected: string[]; onToggle: (id: string) => void }) {
-  const placeholder = pickerPlaceholder({ ...state, isEmpty: state.documents.length === 0 })
+}: Omit<PickerProps, 'hasOnlyNonPdfs'> & {
+  kind: Kind
+  hasOnlyOtherTypes: boolean
+  selected: string[]
+  onToggle: (id: string) => void
+}) {
+  const placeholder = pickerPlaceholder({
+    ...state,
+    kind,
+    hasOnlyOtherTypes,
+    isEmpty: state.documents.length === 0,
+  })
   if (placeholder !== null) return placeholder
+
+  const Icon = WORDING[kind].icon
 
   return (
     <ul className="space-y-2">
@@ -167,18 +229,44 @@ export function PdfMultiSelect({
                   we set would be ignored. The name is the filename and its
                   size, which is what a user is choosing between anyway. */}
               <Checkbox checked={isSelected} onCheckedChange={() => onToggle(document.id)} />
-              <FileText className="text-muted-foreground size-4 shrink-0" aria-hidden />
+              <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden />
               <span className="min-w-0 flex-1">
                 <span className="block truncate text-sm font-medium">
                   {document.original_filename}
                 </span>
                 <span className="text-muted-foreground block text-xs">{meta(document)}</span>
               </span>
-              <PreviewButton documentId={document.id} filename={document.original_filename} />
+              {canPreviewInBrowser(document.mime_type) && (
+                <PreviewButton
+                  documentId={document.id}
+                  filename={document.original_filename}
+                  mimeType={document.mime_type}
+                />
+              )}
             </label>
           </li>
         )
       })}
     </ul>
   )
+}
+
+/** Choose any number of PDFs. */
+export function PdfMultiSelect({
+  hasOnlyNonPdfs,
+  ...props
+}: PickerProps & { selected: string[]; onToggle: (id: string) => void }) {
+  return <MultiSelect {...props} kind="pdf" hasOnlyOtherTypes={hasOnlyNonPdfs} />
+}
+
+/** Choose any number of images. */
+export function ImageMultiSelect({
+  hasOnlyNonImages,
+  ...props
+}: Omit<PickerProps, 'hasOnlyNonPdfs'> & {
+  hasOnlyNonImages: boolean
+  selected: string[]
+  onToggle: (id: string) => void
+}) {
+  return <MultiSelect {...props} kind="image" hasOnlyOtherTypes={hasOnlyNonImages} />
 }

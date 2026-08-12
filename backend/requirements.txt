@@ -25,6 +25,8 @@ PyMuPDF
 pypdf
 pdfplumber
 pillow
+# Reads HEIC, which is what an iPhone writes by default.
+pillow-heif
 
 # --- Rate limiting (in-memory, no Redis) ---
 slowapi
