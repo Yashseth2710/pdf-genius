@@ -111,7 +111,7 @@ export default function DocumentPreviewPage() {
             {isPdf && (
               <Link
                 href="/dashboard/tools/organise"
-                className={buttonVariants({ variant: 'outline' })}
+                className={cn(buttonVariants({ variant: 'outline' }))}
               >
                 <LayoutGrid aria-hidden />
                 Organise pages

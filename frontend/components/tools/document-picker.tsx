@@ -1,6 +1,6 @@
 'use client'
 
-import { FileText, Image as ImageIcon } from 'lucide-react'
+import { FileText, Image as ImageIcon, Plus } from 'lucide-react'
 import Link from 'next/link'
 
 import { PreviewButton } from '@/components/tools/preview-button'
@@ -30,6 +30,7 @@ const WORDING = {
     emptyOthers: 'These tools work on PDFs, and none of your documents is one.',
     emptyNone: 'Upload a PDF and it will show up here.',
     upload: 'Upload a PDF',
+    add: 'Add a PDF',
     loading: 'Loading your PDFs',
     chooseOne: 'Choose a PDF',
   },
@@ -41,6 +42,7 @@ const WORDING = {
     emptyNone:
       'Upload an image — JPG, PNG, GIF, BMP, TIFF, WEBP or HEIC — and it will show up here.',
     upload: 'Upload an image',
+    add: 'Add an image',
     loading: 'Loading your images',
     chooseOne: 'Choose an image',
   },
@@ -118,6 +120,30 @@ function pickerPlaceholder({
   return null
 }
 
+/**
+ * The way to add a file that is not in the list yet.
+ *
+ * Sits under the list rather than in the page header, because that is where
+ * someone is looking when they notice the file they wanted is missing. Without
+ * it, a tool is a dead end for anyone whose next document has not been
+ * uploaded: the only route is the header logo, and nothing says so.
+ *
+ * The same small outline button as the dashboard's tool shortcuts, down to the
+ * size: it is a way out of this step, not one of the things being chosen in
+ * it, and a full-width row would sit among the files looking tickable.
+ *
+ * The empty state already offers an upload, so this appears only when there is
+ * a list for it to sit under; otherwise one screen would say it twice.
+ */
+function AddDocumentLink({ kind }: { kind: Kind }) {
+  return (
+    <Link href="/dashboard" className={cn(buttonVariants({ variant: 'outline' }))}>
+      <Plus aria-hidden />
+      {WORDING[kind].add}
+    </Link>
+  )
+}
+
 interface PickerProps {
   documents: DocumentSummary[]
   isPending: boolean
@@ -148,39 +174,48 @@ export function PdfSingleSelect({
   if (placeholder !== null) return placeholder
 
   return (
-    <RadioGroup
-      // `value` is passed through as null, never as undefined: Base UI decides
-      // on first render whether a group is controlled, and treats undefined as
-      // uncontrolled. Collapsing null to undefined made the group flip from
-      // uncontrolled to controlled the moment a PDF was chosen.
-      value={value}
-      onValueChange={(next) => onChange(String(next))}
-      aria-label="Choose a PDF"
-    >
-      {state.documents.map((document) => (
-        <label
-          key={document.id}
-          className={cn(
-            'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
-            value === document.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
-          )}
-        >
-          <RadioGroupItem value={document.id} />
-          <FileText className="text-muted-foreground size-4 shrink-0" aria-hidden />
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-medium">{document.original_filename}</span>
-            <span className="text-muted-foreground block text-xs">{meta(document)}</span>
-          </span>
-          {/* Checking you picked the right file should not mean leaving the
-              tool and coming back. */}
-          <PreviewButton
-            documentId={document.id}
-            filename={document.original_filename}
-            mimeType={document.mime_type}
-          />
-        </label>
-      ))}
-    </RadioGroup>
+    <div className="space-y-2">
+      <RadioGroup
+        // `value` is passed through as null, never as undefined: Base UI decides
+        // on first render whether a group is controlled, and treats undefined as
+        // uncontrolled. Collapsing null to undefined made the group flip from
+        // uncontrolled to controlled the moment a PDF was chosen.
+        value={value}
+        onValueChange={(next) => onChange(String(next))}
+        aria-label="Choose a PDF"
+      >
+        {state.documents.map((document) => (
+          <label
+            key={document.id}
+            className={cn(
+              'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
+              value === document.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+            )}
+          >
+            <RadioGroupItem value={document.id} />
+            <FileText className="text-muted-foreground size-4 shrink-0" aria-hidden />
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium">
+                {document.original_filename}
+              </span>
+              <span className="text-muted-foreground block text-xs">{meta(document)}</span>
+            </span>
+            {/* Checking you picked the right file should not mean leaving the
+                tool and coming back. */}
+            <PreviewButton
+              documentId={document.id}
+              filename={document.original_filename}
+              mimeType={document.mime_type}
+            />
+          </label>
+        ))}
+      </RadioGroup>
+
+      {/* Outside the group, not the last item in it: a radio group takes arrow
+          keys to move between its options, and a link among them would be a
+          stop that cannot be chosen. */}
+      <AddDocumentLink kind="pdf" />
+    </div>
   )
 }
 
@@ -213,41 +248,47 @@ function MultiSelect({
   const Icon = WORDING[kind].icon
 
   return (
-    <ul className="space-y-2">
-      {state.documents.map((document) => {
-        const isSelected = selected.includes(document.id)
-        return (
-          <li key={document.id}>
-            <label
-              className={cn(
-                'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
-                isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
-              )}
-            >
-              {/* No aria-label here: the whole row is the checkbox's label,
+    <div className="space-y-2">
+      <ul className="space-y-2">
+        {state.documents.map((document) => {
+          const isSelected = selected.includes(document.id)
+          return (
+            <li key={document.id}>
+              <label
+                className={cn(
+                  'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
+                  isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+                )}
+              >
+                {/* No aria-label here: the whole row is the checkbox's label,
                   so Base UI points aria-labelledby at it and any aria-label
                   we set would be ignored. The name is the filename and its
                   size, which is what a user is choosing between anyway. */}
-              <Checkbox checked={isSelected} onCheckedChange={() => onToggle(document.id)} />
-              <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-sm font-medium">
-                  {document.original_filename}
+                <Checkbox checked={isSelected} onCheckedChange={() => onToggle(document.id)} />
+                <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium">
+                    {document.original_filename}
+                  </span>
+                  <span className="text-muted-foreground block text-xs">{meta(document)}</span>
                 </span>
-                <span className="text-muted-foreground block text-xs">{meta(document)}</span>
-              </span>
-              {canPreviewInBrowser(document.mime_type) && (
-                <PreviewButton
-                  documentId={document.id}
-                  filename={document.original_filename}
-                  mimeType={document.mime_type}
-                />
-              )}
-            </label>
-          </li>
-        )
-      })}
-    </ul>
+                {canPreviewInBrowser(document.mime_type) && (
+                  <PreviewButton
+                    documentId={document.id}
+                    filename={document.original_filename}
+                    mimeType={document.mime_type}
+                  />
+                )}
+              </label>
+            </li>
+          )
+        })}
+      </ul>
+
+      {/* Outside the list: the list is the files, and an "add" among them
+          would be one more thing that looks tickable. */}
+      <AddDocumentLink kind={kind} />
+    </div>
   )
 }
 

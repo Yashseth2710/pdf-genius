@@ -76,6 +76,20 @@ test('there is a way back from a tool to the documents', async ({ page }) => {
   await expect(page.getByLabel('Choose files to upload')).toBeAttached()
 })
 
+test('a tool offers a way to add a file that is not in the list', async ({ page }) => {
+  // Without this, a tool is a dead end for anyone whose next document has not
+  // been uploaded yet: the list simply does not contain it and nothing says
+  // where to go.
+  await signUp(page)
+  await upload(page, 'cover.pdf', 1)
+
+  await page.goto('/dashboard/tools/merge')
+  await page.getByRole('link', { name: 'Add a PDF' }).click()
+
+  await expect(page).toHaveURL(/\/dashboard$/)
+  await expect(page.getByLabel('Choose files to upload')).toBeAttached()
+})
+
 test('a tool tells you there is nothing to work on before anything is uploaded', async ({
   page,
 }) => {
