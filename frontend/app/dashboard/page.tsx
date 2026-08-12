@@ -6,6 +6,7 @@ import Link from 'next/link'
 
 import { DocumentList } from '@/components/documents/document-list'
 import { buttonVariants } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
 import { UploadZone } from '@/components/upload/upload-zone'
 import { useAuth } from '@/hooks/use-auth'
 
@@ -25,13 +26,18 @@ export default function DashboardPage() {
       </div>
 
       {/* Two shortcuts rather than the full quick-tools panel: that belongs
-          with the dashboard proper in scope 9, once there is more to show. */}
+          with the dashboard proper in scope 9, once there is more to show.
+
+          Wrapped in cn() rather than passed raw: the button's base sets
+          border-transparent and the outline variant sets border-border, and
+          only tailwind-merge picks the winner. Without it both survive, the
+          transparent one wins, and an outline button has no visible edge. */}
       <div className="flex flex-wrap gap-2">
-        <Link href="/dashboard/tools/merge" className={buttonVariants({ variant: 'outline' })}>
+        <Link href="/dashboard/tools/merge" className={cn(buttonVariants({ variant: 'outline' }))}>
           <Combine aria-hidden />
           Merge PDFs
         </Link>
-        <Link href="/dashboard/tools/split" className={buttonVariants({ variant: 'outline' })}>
+        <Link href="/dashboard/tools/split" className={cn(buttonVariants({ variant: 'outline' }))}>
           <Scissors aria-hidden />
           Split a PDF
         </Link>
