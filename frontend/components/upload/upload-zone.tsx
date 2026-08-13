@@ -95,23 +95,25 @@ export function UploadZone({ onUploaded }: { onUploaded: (document: DocumentSumm
       <div
         {...getRootProps()}
         className={cn(
-          'flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed px-6 py-12 text-center transition-colors',
+          'flex cursor-pointer items-center gap-4 rounded-lg border border-dashed px-6 py-8 transition-colors',
           'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
-          isDragActive ? 'border-primary bg-primary/5' : 'hover:border-muted-foreground/40',
+          isDragActive ? 'border-brand bg-brand-muted/40' : 'hover:border-muted-foreground/50',
         )}
       >
         <input {...getInputProps()} aria-label="Choose files to upload" />
         <CloudUpload
-          className={cn('mb-3 size-8', isDragActive ? 'text-primary' : 'text-muted-foreground')}
+          className={cn('size-5 shrink-0', isDragActive ? 'text-brand' : 'text-muted-foreground')}
           aria-hidden
         />
-        <p className="font-medium">
-          {isDragActive ? 'Drop them here' : 'Drag files here, or click to choose'}
-        </p>
-        <p className="text-muted-foreground mt-1 text-sm">
-          PDF, or JPG, PNG, GIF, BMP, TIFF, WEBP and HEIC images — up to {formatBytes(MAX_BYTES)}{' '}
-          each
-        </p>
+        <div>
+          <p className="font-medium">
+            {isDragActive ? 'Drop them here' : 'Drag files here, or click to choose'}
+          </p>
+          <p className="text-muted-foreground mt-0.5 text-sm">
+            PDF, or JPG, PNG, GIF, BMP, TIFF, WEBP and HEIC images. Up to {formatBytes(MAX_BYTES)}{' '}
+            each.
+          </p>
+        </div>
       </div>
 
       {uploads.length > 0 && (
@@ -143,7 +145,7 @@ export function UploadZone({ onUploaded }: { onUploaded: (document: DocumentSumm
                     aria-label={`Uploading ${upload.file.name}`}
                   >
                     <div
-                      className="bg-primary h-full transition-[width] duration-200"
+                      className="bg-brand h-full transition-[width] duration-200"
                       style={{ width: `${upload.percent}%` }}
                     />
                   </div>

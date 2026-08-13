@@ -108,7 +108,7 @@ export default function ImagesToPdfPage() {
               key={option.value}
               className={cn(
                 'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition-colors',
-                pageSize === option.value ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+                pageSize === option.value ? 'border-brand bg-brand-muted/40' : 'hover:bg-muted/40',
               )}
             >
               <RadioGroupItem value={option.value} className="mt-0.5" />
@@ -137,7 +137,7 @@ export default function ImagesToPdfPage() {
                   className={cn(
                     'flex cursor-pointer items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors',
                     orientation === option.value
-                      ? 'border-primary bg-primary/5'
+                      ? 'border-brand bg-brand-muted/40'
                       : 'hover:bg-muted/40',
                   )}
                 >

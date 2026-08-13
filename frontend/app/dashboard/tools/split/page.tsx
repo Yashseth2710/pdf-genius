@@ -97,7 +97,7 @@ export default function SplitPage() {
               key={option.value}
               className={cn(
                 'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition-colors',
-                mode === option.value ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+                mode === option.value ? 'border-brand bg-brand-muted/40' : 'hover:bg-muted/40',
               )}
             >
               <RadioGroupItem value={option.value} className="mt-0.5" />

@@ -53,24 +53,34 @@ export default function ToolsPage() {
     <div className="space-y-8">
       <div>
         <BackLink href="/dashboard">Your documents</BackLink>
-        <h1 className="text-2xl font-semibold tracking-tight">Tools</h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-3xl">Tools</h1>
+        <p className="text-muted-foreground mt-2">
           Everything here works on the PDFs already in your documents.
         </p>
       </div>
 
-      <ul className="grid gap-4 sm:grid-cols-2">
+      {/* A ruled list, not a grid of boxes. Five identically-sized cards each
+          carrying an icon tile, a heading and a line of text is the default
+          shape of a generated page; a list separated by rules says the same
+          thing with less furniture, and the icon sits in the line of the title
+          where it helps you find a row rather than decorating one. */}
+      <ul className="border-t">
         {TOOLS.map((tool) => (
-          <li key={tool.href}>
+          <li key={tool.href} className="border-b">
             <Link
               href={tool.href}
-              className="hover:border-primary/50 hover:bg-muted/40 focus-visible:ring-ring block h-full rounded-xl border p-5 transition-colors focus-visible:ring-2 focus-visible:outline-none"
+              className="hover:bg-muted/50 focus-visible:ring-ring group flex items-baseline gap-4 px-3 py-4 transition-colors focus-visible:ring-2 focus-visible:outline-none"
             >
-              <span className="bg-primary/10 text-primary mb-4 flex size-10 items-center justify-center rounded-lg">
-                <tool.icon className="size-5" aria-hidden />
+              <tool.icon
+                className="text-muted-foreground group-hover:text-brand size-4 shrink-0 translate-y-0.5 transition-colors"
+                aria-hidden
+              />
+              <span className="min-w-0">
+                <span className="font-heading block text-lg font-semibold">{tool.title}</span>
+                <span className="text-muted-foreground mt-0.5 block text-sm">
+                  {tool.description}
+                </span>
               </span>
-              <span className="block font-medium">{tool.title}</span>
-              <span className="text-muted-foreground mt-1 block text-sm">{tool.description}</span>
             </Link>
           </li>
         ))}

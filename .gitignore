@@ -47,3 +47,12 @@ Thumbs.db
 .vercel
 next-env.d.ts
 *.tsbuildinfo
+
+# --- impeccable (design tooling) ---
+# Installed with `npx impeccable install`, not part of the app. Kept on disk
+# and out of git: 3.3 MB of third-party tooling in the history buys nothing
+# that reinstalling does not.
+.impeccable/
+.github/skills/impeccable/
+.github/agents/impeccable-*
+.github/hooks/impeccable.json

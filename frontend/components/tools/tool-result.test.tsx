@@ -57,7 +57,7 @@ describe('ToolResult', () => {
     const names = screen.getAllByRole('listitem').map((row) => row.textContent)
     expect(names[0]).toContain('report-1-3.pdf')
     expect(names[2]).toContain('report-8-10.pdf')
-    expect(screen.getByText('Done — 3 files')).toBeInTheDocument()
+    expect(screen.getByText('Done. 3 files.')).toBeInTheDocument()
   })
 
   it('gives every result its own download', async () => {

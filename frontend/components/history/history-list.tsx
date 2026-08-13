@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
-  CheckCircle2,
   Combine,
   FileOutput,
   LayoutGrid,
@@ -97,15 +96,18 @@ export function HistoryList() {
       <Filters value={filters} onChange={narrow} />
 
       {isPending ? (
-        <ul className="space-y-2" aria-busy="true" aria-label="Loading your history">
+        <ul className="border-t" aria-busy="true" aria-label="Loading your history">
           {[0, 1, 2].map((row) => (
-            <li key={row} className="bg-muted/50 h-[68px] animate-pulse rounded-lg" />
+            <li key={row} className="border-b px-3 py-3">
+              <div className="bg-muted h-4 w-64 max-w-full animate-pulse rounded" />
+              <div className="bg-muted mt-2 h-3 w-32 animate-pulse rounded" />
+            </li>
           ))}
         </ul>
       ) : isError ? (
-        <div role="alert" className="rounded-lg border border-dashed px-6 py-10 text-center">
+        <div role="alert" className="rounded-lg border border-dashed px-6 py-10">
           <p className="font-medium">Could not load your history</p>
-          <p className="text-muted-foreground mt-1 text-sm">
+          <p className="text-muted-foreground mt-1 max-w-md text-sm">
             {error instanceof ApiError ? error.message : 'Something went wrong.'}
           </p>
           <Button variant="outline" size="sm" className="mt-4" onClick={() => void refetch()}>
@@ -116,7 +118,7 @@ export function HistoryList() {
         <Empty isFiltered={isFiltered} onClear={() => narrow({})} />
       ) : (
         <>
-          <ul className="space-y-2">
+          <ul className="border-t">
             {data.items.map((job) => (
               <JobRow
                 key={job.id}
@@ -129,8 +131,8 @@ export function HistoryList() {
 
           {data.total > PAGE_SIZE && (
             <nav className="flex items-center justify-between" aria-label="Pagination">
-              <p className="text-muted-foreground text-sm">
-                Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(data.total / PAGE_SIZE)} —{' '}
+              <p className="text-muted-foreground tabular text-sm">
+                Page {Math.floor(offset / PAGE_SIZE) + 1} of {Math.ceil(data.total / PAGE_SIZE)},{' '}
                 {data.total} entries
               </p>
               <div className="flex gap-2">
@@ -262,25 +264,27 @@ function JobRow({
   const running = job.status === 'PROCESSING' || job.status === 'QUEUED'
 
   return (
-    <li className="flex items-center gap-3 rounded-lg border px-3 py-2.5">
-      <span
-        className={cn(
-          'flex size-9 shrink-0 items-center justify-center rounded-lg',
-          failed ? 'bg-destructive/10 text-destructive' : 'bg-primary/10 text-primary',
-        )}
-      >
-        <Icon className="size-4" aria-hidden />
-      </span>
+    <li className="flex items-center gap-3 border-b px-3 py-3">
+      {/* The icon says which tool ran and takes its colour from whether the run
+          worked. That is one signal in one place, instead of a tinted tile on
+          the left and a coloured chip on the right both reporting the same
+          thing on every row of the list. */}
+      <Icon
+        className={cn('size-4 shrink-0', failed ? 'text-destructive' : 'text-muted-foreground')}
+        aria-hidden
+      />
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">
           {operationLabel(job.operation)} {describeJob(job)}
         </p>
-        <p className="text-muted-foreground flex flex-wrap items-center gap-x-2 text-xs">
+        <p className="text-muted-foreground mt-0.5 flex flex-wrap items-center gap-x-2 text-xs">
           {/* The exact time is a title rather than the label: "4 minutes ago"
               is what someone wants at a glance, and the timestamp is there for
               anyone who needs to be precise. */}
-          <span title={formatExactly(job.created_at)}>{formatWhen(job.created_at)}</span>
+          <span className="tabular" title={formatExactly(job.created_at)}>
+            {formatWhen(job.created_at)}
+          </span>
           {failed && (
             <span className="text-destructive inline-flex items-center gap-1">
               <XCircle className="size-3" aria-hidden />
@@ -293,12 +297,10 @@ function JobRow({
               Still running
             </span>
           )}
-          {!failed && !running && (
-            <span className="inline-flex items-center gap-1 text-green-700 dark:text-green-500">
-              <CheckCircle2 className="size-3" aria-hidden />
-              Completed
-            </span>
-          )}
+          {/* Completed stays on the row, but plainly. A green tick beside every
+              entry in a list where almost everything succeeds is decoration:
+              it is the exceptions that need marking. */}
+          {!failed && !running && <span>Completed</span>}
         </p>
       </div>
 
@@ -330,7 +332,7 @@ function JobRow({
         </TooltipTrigger>
         {/* Says what survives, because "delete" next to a list of files you
             made is a genuinely frightening button. */}
-        <TooltipContent>Remove the entry — your files are kept</TooltipContent>
+        <TooltipContent>Removes the entry. Your files are kept.</TooltipContent>
       </Tooltip>
     </li>
   )
@@ -343,9 +345,9 @@ function Empty({ isFiltered, onClear }: { isFiltered: boolean; onClear: () => vo
   // sort of thing that makes an app feel like it is not paying attention.
   if (isFiltered) {
     return (
-      <div className="rounded-xl border border-dashed px-6 py-14 text-center">
-        <h3 className="font-medium">Nothing matches those filters</h3>
-        <p className="text-muted-foreground mt-1.5 text-sm">
+      <div className="rounded-lg border border-dashed px-6 py-12">
+        <h3 className="text-lg">Nothing matches those filters</h3>
+        <p className="text-muted-foreground mt-1.5 max-w-sm text-sm">
           There is history here, just not of this kind.
         </p>
         <Button variant="outline" size="sm" className="mt-4" onClick={onClear}>
@@ -356,9 +358,9 @@ function Empty({ isFiltered, onClear }: { isFiltered: boolean; onClear: () => vo
   }
 
   return (
-    <div className="rounded-xl border border-dashed px-6 py-14 text-center">
-      <h3 className="font-medium">Nothing here yet</h3>
-      <p className="text-muted-foreground mt-1.5 text-sm">
+    <div className="rounded-lg border border-dashed px-6 py-12">
+      <h3 className="text-lg">Nothing here yet</h3>
+      <p className="text-muted-foreground mt-1.5 max-w-sm text-sm">
         Every merge, split, compression and conversion you run shows up here.
       </p>
       <Link

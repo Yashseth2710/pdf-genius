@@ -21,9 +21,12 @@ export function AuthFormShell({
   children,
 }: AuthFormShellProps) {
   return (
-    <Card className="w-full max-w-md shadow-sm">
-      <CardHeader className="space-y-1">
-        <CardTitle className="text-2xl tracking-tight">{title}</CardTitle>
+    // No shadow under the ring. A hairline edge and a soft drop shadow doing
+    // the same job at once is a generated-UI signature; the card is on a plain
+    // page and the ring is enough to seat it.
+    <Card className="w-full max-w-md [--card-spacing:--spacing(6)]">
+      <CardHeader className="space-y-1.5">
+        <CardTitle className="font-heading text-2xl">{title}</CardTitle>
         <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

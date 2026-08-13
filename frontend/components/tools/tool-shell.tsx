@@ -19,11 +19,11 @@ export function ToolShell({
   children: React.ReactNode
 }) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
         <BackLink href="/dashboard/tools">All tools</BackLink>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-        <p className="text-muted-foreground mt-1">{description}</p>
+        <h1 className="text-3xl">{title}</h1>
+        <p className="text-muted-foreground mt-2">{description}</p>
       </div>
 
       {children}
@@ -34,9 +34,14 @@ export function ToolShell({
 /**
  * One numbered step.
  *
- * The number is decoration, so it is hidden from screen readers: the heading
- * already says what the step is, and "1 Choose your PDFs" read aloud is worse
- * than "Choose your PDFs".
+ * The number hangs in the left margin as plain mono type rather than sitting in
+ * a tinted circle. These steps are genuinely sequential — you cannot split a
+ * PDF before choosing one — so the numbers are doing real work, but a coloured
+ * pill around each one is furniture, and at four steps down a page it is a
+ * column of furniture.
+ *
+ * It is hidden from screen readers: the heading already says what the step is,
+ * and "1 Choose your PDFs" read aloud is worse than "Choose your PDFs".
  */
 export function ToolStep({
   step,
@@ -50,21 +55,21 @@ export function ToolStep({
   children: React.ReactNode
 }) {
   return (
-    <section className="space-y-4">
-      <div className="flex items-start gap-3">
-        <span
-          className="bg-primary/10 text-primary mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold"
-          aria-hidden
-        >
-          {step}
-        </span>
-        <div>
-          <h2 className="font-medium tracking-tight">{title}</h2>
-          {description && <p className="text-muted-foreground mt-0.5 text-sm">{description}</p>}
-        </div>
-      </div>
+    <section className="sm:grid sm:grid-cols-[2rem_1fr] sm:gap-x-4">
+      {/* Not set in mono. Mono earns its place on code, data and measurement —
+          the byte counts in the compression result — and a single digit in it
+          is the typeface worn as a costume for "technical". */}
+      <span className="text-muted-foreground tabular hidden text-sm leading-7 sm:block" aria-hidden>
+        {step}.
+      </span>
 
-      <div className="pl-9">{children}</div>
+      <div className="space-y-4">
+        <div>
+          <h2 className="text-xl">{title}</h2>
+          {description && <p className="text-muted-foreground mt-1 text-sm">{description}</p>}
+        </div>
+        {children}
+      </div>
     </section>
   )
 }

@@ -31,12 +31,10 @@ export default function DashboardPage() {
   const queryClient = useQueryClient()
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-10">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Welcome{user ? `, ${user.first_name}` : ''}
-        </h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-3xl">Welcome{user ? `, ${user.first_name}` : ''}</h1>
+        <p className="text-muted-foreground mt-2">
           Upload a document, then put one of the tools to work on it.
         </p>
       </div>
@@ -65,8 +63,8 @@ export default function DashboardPage() {
         onUploaded={() => void queryClient.invalidateQueries({ queryKey: ['documents'] })}
       />
 
-      <section className="space-y-3">
-        <h2 className="text-lg font-medium tracking-tight">Your documents</h2>
+      <section className="space-y-4">
+        <h2 className="text-xl">Your documents</h2>
         <DocumentList />
       </section>
 

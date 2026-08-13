@@ -7,9 +7,19 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-sans);
-  --font-mono: var(--font-geist-mono);
-  --font-heading: var(--font-sans);
+  /* Three faces, each with a job. Public Sans runs the interface: it is a
+     civic typeface, drawn for forms and government documents, which is very
+     nearly what this app is. Source Serif carries the headings, roman and
+     never italic, because a product about documents should look like it has
+     read one. IBM Plex Mono is for filenames, byte counts and page numbers,
+     where digits need to line up in a column. */
+  --font-sans: var(--font-public-sans);
+  --font-mono: var(--font-plex-mono);
+  --font-heading: var(--font-source-serif);
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-brand-muted: var(--brand-muted);
+  --color-success: var(--success);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -48,83 +58,154 @@
   --radius-4xl: calc(var(--radius) * 2.6);
 }
 
+/*
+ * The palette is ink on paper, with one red.
+ *
+ * Every neutral carries a little chroma on a warm hue. Pure `oklch(x 0 0)`
+ * greys are what you get when nobody chose, and a screen full of them reads
+ * as dead rather than as neutral; a few thousandths of warmth is invisible as
+ * colour but visible as intent. It stays under 0.006 so this never becomes a
+ * cream or beige page, which is its own reflex.
+ *
+ * Red is the brand, taken from the fold in the logo, and it is the only hue in
+ * the product. It marks the current thing and nothing else, so that when it
+ * appears it means something. Buttons stay ink: a red primary would argue with
+ * the red on the delete actions, and destructive should never have to shout
+ * over the furniture to be heard.
+ */
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
+  --background: oklch(0.995 0.002 80);
+  --foreground: oklch(0.22 0.008 60);
   --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
+  --card-foreground: oklch(0.22 0.008 60);
   --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
-  --primary-foreground: oklch(0.985 0 0);
-  --secondary: oklch(0.97 0 0);
-  --secondary-foreground: oklch(0.205 0 0);
-  --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
-  --accent: oklch(0.97 0 0);
-  --accent-foreground: oklch(0.205 0 0);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.922 0 0);
-  --input: oklch(0.922 0 0);
-  --ring: oklch(0.708 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --radius: 0.625rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.205 0 0);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.97 0 0);
-  --sidebar-accent-foreground: oklch(0.205 0 0);
-  --sidebar-border: oklch(0.922 0 0);
-  --sidebar-ring: oklch(0.708 0 0);
+  --popover-foreground: oklch(0.22 0.008 60);
+  --primary: oklch(0.25 0.01 60);
+  --primary-foreground: oklch(0.985 0.002 80);
+  --secondary: oklch(0.965 0.004 80);
+  --secondary-foreground: oklch(0.25 0.01 60);
+  --muted: oklch(0.965 0.004 80);
+  --muted-foreground: oklch(0.515 0.011 65);
+  --accent: oklch(0.955 0.005 75);
+  --accent-foreground: oklch(0.25 0.01 60);
+  --destructive: oklch(0.55 0.2 27);
+  --brand: oklch(0.53 0.19 27);
+  --brand-foreground: oklch(0.99 0.002 80);
+  --brand-muted: oklch(0.94 0.03 30);
+  /* The one green, and it is a status colour rather than a decorative one:
+     used on the tick that says an operation finished, nowhere else. In the
+     palette rather than reached for as a raw `green-700` at the call site,
+     which is how a design system acquires colours nobody chose. */
+  --success: oklch(0.5 0.13 150);
+  --border: oklch(0.9 0.005 75);
+  --input: oklch(0.9 0.005 75);
+  --ring: oklch(0.53 0.19 27);
+  --chart-1: oklch(0.53 0.19 27);
+  --chart-2: oklch(0.515 0.011 65);
+  --chart-3: oklch(0.43 0.009 62);
+  --chart-4: oklch(0.36 0.009 60);
+  --chart-5: oklch(0.28 0.008 60);
+  /* 8px. Cards sit at 10px and inputs at 8px, well inside the 12-16px ceiling
+     past which every element rounds into the same soft blob. */
+  --radius: 0.5rem;
+  --sidebar: oklch(0.98 0.003 80);
+  --sidebar-foreground: oklch(0.22 0.008 60);
+  --sidebar-primary: oklch(0.25 0.01 60);
+  --sidebar-primary-foreground: oklch(0.985 0.002 80);
+  --sidebar-accent: oklch(0.955 0.005 75);
+  --sidebar-accent-foreground: oklch(0.25 0.01 60);
+  --sidebar-border: oklch(0.9 0.005 75);
+  --sidebar-ring: oklch(0.53 0.19 27);
 }
 
+/*
+ * Dark is the same ink and paper with the lights off: warm-neutral surfaces,
+ * no coloured glows behind anything. The red lifts to 0.62 because a 0.53 red
+ * on a near-black ground fails contrast and reads as brown.
+ */
 .dark {
-  --background: oklch(0.145 0 0);
-  --foreground: oklch(0.985 0 0);
-  --card: oklch(0.205 0 0);
-  --card-foreground: oklch(0.985 0 0);
-  --popover: oklch(0.205 0 0);
-  --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
-  --primary-foreground: oklch(0.205 0 0);
-  --secondary: oklch(0.269 0 0);
-  --secondary-foreground: oklch(0.985 0 0);
-  --muted: oklch(0.269 0 0);
-  --muted-foreground: oklch(0.708 0 0);
-  --accent: oklch(0.269 0 0);
-  --accent-foreground: oklch(0.985 0 0);
-  --destructive: oklch(0.704 0.191 22.216);
-  --border: oklch(1 0 0 / 10%);
+  --background: oklch(0.17 0.005 60);
+  --foreground: oklch(0.95 0.003 80);
+  --card: oklch(0.215 0.006 60);
+  --card-foreground: oklch(0.95 0.003 80);
+  --popover: oklch(0.215 0.006 60);
+  --popover-foreground: oklch(0.95 0.003 80);
+  --primary: oklch(0.93 0.003 80);
+  --primary-foreground: oklch(0.2 0.006 60);
+  --secondary: oklch(0.28 0.007 60);
+  --secondary-foreground: oklch(0.95 0.003 80);
+  --muted: oklch(0.28 0.007 60);
+  --muted-foreground: oklch(0.7 0.008 70);
+  --accent: oklch(0.3 0.008 60);
+  --accent-foreground: oklch(0.95 0.003 80);
+  --destructive: oklch(0.66 0.18 27);
+  --brand: oklch(0.62 0.18 27);
+  --brand-foreground: oklch(0.99 0.002 80);
+  --brand-muted: oklch(0.32 0.05 28);
+  --success: oklch(0.68 0.14 150);
+  --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);
-  --ring: oklch(0.556 0 0);
-  --chart-1: oklch(0.87 0 0);
-  --chart-2: oklch(0.556 0 0);
-  --chart-3: oklch(0.439 0 0);
-  --chart-4: oklch(0.371 0 0);
-  --chart-5: oklch(0.269 0 0);
-  --sidebar: oklch(0.205 0 0);
-  --sidebar-foreground: oklch(0.985 0 0);
-  --sidebar-primary: oklch(0.488 0.243 264.376);
-  --sidebar-primary-foreground: oklch(0.985 0 0);
-  --sidebar-accent: oklch(0.269 0 0);
-  --sidebar-accent-foreground: oklch(0.985 0 0);
-  --sidebar-border: oklch(1 0 0 / 10%);
-  --sidebar-ring: oklch(0.556 0 0);
+  --ring: oklch(0.62 0.18 27);
+  --chart-1: oklch(0.62 0.18 27);
+  --chart-2: oklch(0.7 0.008 70);
+  --chart-3: oklch(0.58 0.008 65);
+  --chart-4: oklch(0.45 0.007 62);
+  --chart-5: oklch(0.33 0.007 60);
+  --sidebar: oklch(0.2 0.006 60);
+  --sidebar-foreground: oklch(0.95 0.003 80);
+  --sidebar-primary: oklch(0.62 0.18 27);
+  --sidebar-primary-foreground: oklch(0.99 0.002 80);
+  --sidebar-accent: oklch(0.3 0.008 60);
+  --sidebar-accent-foreground: oklch(0.95 0.003 80);
+  --sidebar-border: oklch(1 0 0 / 12%);
+  --sidebar-ring: oklch(0.62 0.18 27);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
   html {
     @apply font-sans;
+  }
+  body {
+    /* 1.6 leading on body text. Anything under 1.3 makes multi-line text hard
+       to follow, and the browser default of ~1.2 is under it. */
+    @apply bg-background text-foreground leading-relaxed;
+  }
+
+  /*
+   * Headings wear the serif by default, so no component has to remember to ask
+   * for it. Leading tightens as size grows, which is how type has always been
+   * set: a 36px line does not need the same air as a 16px one.
+   *
+   * No negative tracking. A text serif is drawn with the spacing it wants, and
+   * pulling it tighter to look "designed" only costs legibility.
+   */
+  h1,
+  h2,
+  h3,
+  h4 {
+    /* `text-balance`, not `text-pretty`: headings want their lines evened out
+       so the last one is not a single orphaned word. `text-pretty` is the
+       body-copy setting and only guards the final line. */
+    @apply font-heading leading-tight font-semibold text-balance;
+  }
+
+  /* Digits line up in a column: file sizes in a list, page numbers in a grid,
+     percentages in the history. Proportional figures make those wander. */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Light type on a dark ground optically blooms, so the same tracking that
+     reads as even in the light theme reads as tight here. A hair of extra
+     letter-spacing on body text puts it back. Headings are large enough not to
+     need it, and would look loose if they got it. */
+  .dark body {
+    letter-spacing: 0.006em;
+  }
+  .dark :is(h1, h2, h3, h4) {
+    letter-spacing: normal;
   }
 }

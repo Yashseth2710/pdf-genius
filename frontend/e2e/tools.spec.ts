@@ -185,7 +185,7 @@ test('several ranges come back as separate PDFs, not an archive', async ({ page 
   await page.getByRole('button', { name: 'Split PDF' }).click()
 
   const result = page.getByRole('status', { name: 'Result' })
-  await expect(result).toContainText('Done — 3 files')
+  await expect(result).toContainText('Done. 3 files.')
   await expect(result.getByRole('listitem')).toHaveCount(3)
   await expect(result).toContainText('report-1-2.pdf')
   await expect(result).toContainText('report-7-8.pdf')

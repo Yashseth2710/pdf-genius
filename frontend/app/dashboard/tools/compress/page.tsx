@@ -90,7 +90,7 @@ export default function CompressPage() {
               key={option.value}
               className={cn(
                 'flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-3 transition-colors',
-                level === option.value ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+                level === option.value ? 'border-brand bg-brand-muted/40' : 'hover:bg-muted/40',
               )}
             >
               <RadioGroupItem value={option.value} className="mt-0.5" />
@@ -160,12 +160,15 @@ function SavingSummary({
   measured: { original_size: number; final_size: number; saved_percent: number }
 }) {
   return (
-    <div className="bg-primary/5 border-primary/20 rounded-lg border px-4 py-3">
-      <p className="text-sm font-medium">
+    // The number is the result, so it is set like one: large, in the heading
+    // serif, with the before and after underneath in mono. A tinted box with
+    // 14px text in it treats the one thing the user came for as a notification.
+    <div className="border-t pt-4">
+      <p className="font-heading text-3xl font-semibold">
         {Math.round(measured.saved_percent)}% smaller
-        <span className="text-muted-foreground ml-2 font-normal tabular-nums">
-          {formatBytes(measured.original_size)} → {formatBytes(measured.final_size)}
-        </span>
+      </p>
+      <p className="text-muted-foreground mt-1 font-mono text-sm">
+        {formatBytes(measured.original_size)} → {formatBytes(measured.final_size)}
       </p>
     </div>
   )

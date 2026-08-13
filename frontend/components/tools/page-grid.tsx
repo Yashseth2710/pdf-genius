@@ -127,8 +127,8 @@ function PageCard({
       ref={setNodeRef}
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
-        'bg-background rounded-xl border p-2 transition-colors',
-        isDragging && 'ring-primary/40 relative z-10 shadow-lg ring-2',
+        'bg-background rounded-lg border p-2 transition-colors',
+        isDragging && 'ring-brand/50 relative z-10 shadow-lg ring-2',
         entry.removed && 'border-dashed',
       )}
       data-testid={`page-card-${entry.number}`}

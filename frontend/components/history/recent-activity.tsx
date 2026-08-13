@@ -35,7 +35,7 @@ export function RecentActivity() {
   if (isPending) {
     return (
       <section className="space-y-3">
-        <h2 className="text-lg font-medium tracking-tight">Recent activity</h2>
+        <h2 className="text-xl">Recent activity</h2>
         <ul className="space-y-2" aria-busy="true" aria-label="Loading recent activity">
           {[0, 1].map((row) => (
             <li key={row} className="bg-muted/50 h-[52px] animate-pulse rounded-lg" />
@@ -53,7 +53,7 @@ export function RecentActivity() {
   return (
     <section className="space-y-3">
       <div className="flex items-center justify-between gap-4">
-        <h2 className="text-lg font-medium tracking-tight">Recent activity</h2>
+        <h2 className="text-xl">Recent activity</h2>
         <Link
           href="/dashboard/history"
           className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
@@ -63,18 +63,21 @@ export function RecentActivity() {
         </Link>
       </div>
 
-      <ul className="space-y-2">
+      {/* Ruled rows rather than five stacked bordered boxes. A box around every
+          line of a list is depth that says nothing: the rows are siblings, and
+          a hairline between them says so more quietly. */}
+      <ul className="border-t">
         {data.items.map((job) => (
           <li
             key={job.id}
-            className="flex items-center justify-between gap-3 rounded-lg border px-3 py-2"
+            className="flex items-baseline justify-between gap-4 border-b py-2.5 text-sm"
           >
-            <p className="min-w-0 truncate text-sm">
+            <p className="min-w-0 truncate">
               <span className="font-medium">{operationLabel(job.operation)}</span>{' '}
               <span className="text-muted-foreground">{describeJob(job)}</span>
             </p>
             <span
-              className="text-muted-foreground shrink-0 text-xs"
+              className="text-muted-foreground tabular shrink-0 text-xs"
               title={formatExactly(job.created_at)}
             >
               {formatWhen(job.created_at)}

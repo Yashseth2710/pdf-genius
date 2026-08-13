@@ -12,7 +12,7 @@ export default function HistoryPage() {
     <div className="space-y-8">
       <div>
         <BackLink href="/dashboard">Your documents</BackLink>
-        <h1 className="text-2xl font-semibold tracking-tight">History</h1>
+        <h1 className="text-3xl">History</h1>
         <p className="text-muted-foreground mt-1">
           Everything you have run, newest first — including the runs that failed.
         </p>
