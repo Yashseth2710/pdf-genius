@@ -110,8 +110,8 @@ export function UploadZone({ onUploaded }: { onUploaded: (document: DocumentSumm
             {isDragActive ? 'Drop them here' : 'Drag files here, or click to choose'}
           </p>
           <p className="text-muted-foreground mt-0.5 text-sm">
-            PDF, or JPG, PNG, GIF, BMP, TIFF, WEBP and HEIC images. Up to{' '}
-            {formatBytes(MAX_BYTES)} each.
+            PDF, or JPG, PNG, GIF, BMP, TIFF, WEBP and HEIC images. Up to {formatBytes(MAX_BYTES)}{' '}
+            each.
           </p>
         </div>
       </div>
