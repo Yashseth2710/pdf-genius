@@ -47,10 +47,23 @@ def test_deleting_a_user_takes_their_data_with_them() -> None:
         assert fk.ondelete == "CASCADE", model.__tablename__
 
 
-def test_deleting_a_document_takes_its_jobs_and_sessions() -> None:
-    for model in (ProcessingJob, AISession):
-        fk = next(fk for fk in model.__table__.foreign_keys if fk.column.table.name == "documents")
-        assert fk.ondelete == "CASCADE", model.__tablename__
+def test_deleting_a_document_takes_its_ai_sessions() -> None:
+    """A conversation about a document is meaningless once it is gone."""
+    fk = next(fk for fk in AISession.__table__.foreign_keys if fk.column.table.name == "documents")
+    assert fk.ondelete == "CASCADE"
+
+
+def test_deleting_a_document_leaves_the_history_of_what_was_done_to_it() -> None:
+    """Deliberately not CASCADE, which is what this was until scope 9.
+
+    A job is a record that something happened, and it has to outlive the file
+    it happened to - otherwise tidying up your documents silently erases your
+    history, and nobody notices entries that are missing.
+    """
+    fk = next(
+        fk for fk in ProcessingJob.__table__.foreign_keys if fk.column.table.name == "documents"
+    )
+    assert fk.ondelete == "SET NULL"
 
 
 def test_a_job_can_exist_without_a_single_source_document() -> None:

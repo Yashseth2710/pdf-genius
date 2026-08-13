@@ -8,6 +8,7 @@ else's file.
 
 import uuid
 import zipfile
+from datetime import UTC, datetime, timedelta
 from functools import cache
 from io import BytesIO
 from typing import Any
@@ -591,6 +592,153 @@ def test_jobs_can_be_filtered_by_operation(authed_client: TestClient) -> None:
 
     assert page["total"] == 1
     assert page["items"][0]["operation"] == "MERGE"
+
+
+def test_jobs_can_be_filtered_by_status(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 2)
+    authed_client.post(SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1"})
+    # A range past the end fails before a job is written, so a failure has to be
+    # provoked with something that gets far enough to record one.
+    authed_client.post(COMPRESS, json={"document_id": document_id, "level": "basic"})
+
+    page = authed_client.get(JOBS, params={"status": "COMPLETED"}).json()["data"]
+
+    assert page["total"] == 2
+    assert {item["status"] for item in page["items"]} == {"COMPLETED"}
+
+    none_failed = authed_client.get(JOBS, params={"status": "FAILED"}).json()["data"]
+    assert none_failed["total"] == 0
+
+
+def test_filters_combine_rather_than_replace_each_other(authed_client: TestClient) -> None:
+    first = upload_pdf(authed_client, "a.pdf", 2)
+    second = upload_pdf(authed_client, "b.pdf", 2)
+    authed_client.post(MERGE, json={"document_ids": [first, second]})
+    authed_client.post(SPLIT, json={"document_id": first, "mode": "ranges", "ranges": "1"})
+
+    page = authed_client.get(JOBS, params={"operation": "SPLIT", "status": "COMPLETED"}).json()[
+        "data"
+    ]
+
+    assert page["total"] == 1
+    assert page["items"][0]["operation"] == "SPLIT"
+
+
+def test_a_date_range_includes_both_of_its_ends(authed_client: TestClient) -> None:
+    """Today's work has to show up when today is both the from and the to.
+
+    The obvious implementation - comparing against midnight - excludes
+    everything after midnight on the last day, which is to say all of it.
+    """
+    document_id = upload_pdf(authed_client, "report.pdf", 2)
+    authed_client.post(SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1"})
+    today = datetime.now(UTC).date().isoformat()
+
+    page = authed_client.get(JOBS, params={"date_from": today, "date_to": today}).json()["data"]
+
+    assert page["total"] == 1
+
+
+def test_a_date_range_that_ended_yesterday_finds_nothing(authed_client: TestClient) -> None:
+    document_id = upload_pdf(authed_client, "report.pdf", 2)
+    authed_client.post(SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1"})
+    yesterday = (datetime.now(UTC).date() - timedelta(days=1)).isoformat()
+
+    page = authed_client.get(JOBS, params={"date_to": yesterday}).json()["data"]
+
+    assert page["total"] == 0
+
+
+def test_the_count_agrees_with_the_filtered_list(authed_client: TestClient) -> None:
+    # The list and the total are two queries. If they filter differently the
+    # paginator walks off the end of a page that does not exist.
+    first = upload_pdf(authed_client, "a.pdf", 2)
+    second = upload_pdf(authed_client, "b.pdf", 2)
+    authed_client.post(MERGE, json={"document_ids": [first, second]})
+    for ranges in ("1", "2"):
+        authed_client.post(SPLIT, json={"document_id": first, "mode": "ranges", "ranges": ranges})
+
+    page = authed_client.get(JOBS, params={"operation": "SPLIT", "limit": 100}).json()["data"]
+
+    assert page["total"] == len(page["items"]) == 2
+
+
+# --- Deleting a history entry -------------------------------------------
+
+
+def test_a_history_entry_can_be_deleted(authed_client: TestClient) -> None:
+    first = upload_pdf(authed_client, "a.pdf", 1)
+    second = upload_pdf(authed_client, "b.pdf", 1)
+    job_id = authed_client.post(MERGE, json={"document_ids": [first, second]}).json()["data"][
+        "job"
+    ]["id"]
+
+    response = authed_client.delete(f"{JOBS}/{job_id}")
+
+    assert response.status_code == 200
+    assert response.json()["data"] == {"id": job_id, "deleted": True}
+    assert authed_client.get(f"{JOBS}/{job_id}").status_code == 404
+    assert authed_client.get(JOBS).json()["data"]["total"] == 0
+
+
+def test_deleting_a_history_entry_keeps_the_files_it_made(authed_client: TestClient) -> None:
+    """Tidying a history is not a request to lose the work."""
+    first = upload_pdf(authed_client, "a.pdf", 1)
+    second = upload_pdf(authed_client, "b.pdf", 1)
+    run = authed_client.post(MERGE, json={"document_ids": [first, second]}).json()["data"]
+    output_id = run["outputs"][0]["id"]
+
+    authed_client.delete(f"{JOBS}/{run['job']['id']}")
+
+    assert authed_client.get(f"{DOCUMENTS}/{output_id}").status_code == 200
+    assert len(download(authed_client, output_id)) > 0
+
+
+def test_another_users_history_entry_cannot_be_deleted(authed_client: TestClient) -> None:
+    first = upload_pdf(authed_client, "a.pdf", 1)
+    second = upload_pdf(authed_client, "b.pdf", 1)
+    job_id = authed_client.post(MERGE, json={"document_ids": [first, second]}).json()["data"][
+        "job"
+    ]["id"]
+
+    token = second_user(authed_client)
+    response = authed_client.delete(
+        f"{JOBS}/{job_id}", headers={"Authorization": f"Bearer {token}"}
+    )
+
+    assert response.status_code == 404
+    # And it is still there for its owner.
+    assert authed_client.get(f"{JOBS}/{job_id}").status_code == 200
+
+
+def test_deleting_a_history_entry_needs_a_signed_in_user(api_client: TestClient) -> None:
+    assert api_client.delete(f"{JOBS}/{uuid.uuid4()}").status_code == 401
+
+
+# --- History outlives its documents --------------------------------------
+
+
+def test_deleting_a_document_keeps_the_history_of_what_was_done_to_it(
+    authed_client: TestClient,
+) -> None:
+    """The reason document_id is SET NULL rather than CASCADE.
+
+    It used to cascade, so tidying up your documents silently erased the record
+    of the work - and nobody notices a history that is missing entries.
+    """
+    document_id = upload_pdf(authed_client, "report.pdf", 4)
+    job_id = authed_client.post(
+        SPLIT, json={"document_id": document_id, "mode": "ranges", "ranges": "1-2"}
+    ).json()["data"]["job"]["id"]
+
+    assert authed_client.delete(f"{DOCUMENTS}/{document_id}").status_code == 200
+
+    job = authed_client.get(f"{JOBS}/{job_id}")
+    assert job.status_code == 200
+    # The entry survives; it has simply forgotten which document it began with,
+    # which is the same shape a merge has always had.
+    assert job.json()["data"]["document_id"] is None
+    assert job.json()["data"]["options"] == {"mode": "ranges", "ranges": "1-2"}
 
 
 def test_a_job_never_exposes_where_the_output_is_stored(authed_client: TestClient) -> None:

@@ -21,7 +21,7 @@ from sqlalchemy.orm import Session
 from app.core.errors import AppError, NotFoundError
 from app.models import Document, ProcessingJob, User
 from app.models.enums import JobStatus, OperationType
-from app.repositories.job import ProcessingJobRepository
+from app.repositories.job import JobFilters, ProcessingJobRepository
 
 logger = logging.getLogger(__name__)
 
@@ -115,9 +115,20 @@ class JobService:
         *,
         limit: int = 20,
         offset: int = 0,
-        operation: OperationType | None = None,
+        filters: JobFilters | None = None,
     ) -> tuple[Sequence[ProcessingJob], int]:
         return (
-            self.jobs.list_for_user(user.id, limit=limit, offset=offset, operation=operation),
-            self.jobs.count_for_user(user.id, operation=operation),
+            self.jobs.list_for_user(user.id, limit=limit, offset=offset, filters=filters),
+            self.jobs.count_for_user(user.id, filters=filters),
         )
+
+    def delete(self, job: ProcessingJob) -> None:
+        """Remove one entry from the history.
+
+        Only the record goes. Whatever the job produced stays: outputs are
+        ordinary documents in the user's list, and someone tidying their
+        history has not asked to lose the files they made.
+        """
+        self.jobs.delete(job)
+        self.db.commit()
+        logger.info("Deleted job id=%s", job.id)

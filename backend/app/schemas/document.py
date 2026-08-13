@@ -33,11 +33,6 @@ class DocumentListResponse(BaseModel):
     offset: int
 
 
-class DeletedResponse(BaseModel):
-    id: uuid.UUID
-    deleted: bool = True
-
-
 class ArchiveRequest(BaseModel):
     """Documents to bundle into one download.
 

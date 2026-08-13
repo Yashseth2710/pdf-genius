@@ -15,7 +15,7 @@ task.
 ## Why
 
 A student finishing an assignment often has to merge a few PDFs, compress the
-result, convert some images, drop a page and add a watermark. Doing that today
+result, turn some photos into a document and drop a page. Doing that today
 usually means several sites, repeated uploads, adverts, file-size limits and no
 history of what happened. PDF Genius puts the whole workflow in one interface,
 keeps documents private to the account that uploaded them, and adds AI that can
@@ -159,9 +159,9 @@ each one delivers and when it counts as finished.
 - [x] **4** — File infrastructure: upload, validation, storage, download, delete
 - [x] **5** — Merge and split
 - [x] **6** — Page organisation: rotate, delete, reorder, extract, plus preview
-- [ ] **7** — Compression and image conversion
-- [ ] **8** — Text watermark
-- [ ] **9** — Dashboard and history
+- [x] **7** — Compression, and images into a PDF
+- [ ] ~~**8** — Text watermark~~ — dropped; see [ROADMAP.md](docs/ROADMAP.md)
+- [x] **9** — Dashboard and history
 - [ ] **10** — AI: text extraction, summaries, ask-your-PDF
 - [ ] **11** — Hardening: accessibility, security, performance
 - [ ] **12** — Deployment
