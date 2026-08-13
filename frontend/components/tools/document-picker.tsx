@@ -189,7 +189,7 @@ export function PdfSingleSelect({
             key={document.id}
             className={cn(
               'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
-              value === document.id ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+              value === document.id ? 'border-brand bg-brand-muted/40' : 'hover:bg-muted/40',
             )}
           >
             <RadioGroupItem value={document.id} />
@@ -257,7 +257,7 @@ function MultiSelect({
               <label
                 className={cn(
                   'flex cursor-pointer items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors',
-                  isSelected ? 'border-primary bg-primary/5' : 'hover:bg-muted/40',
+                  isSelected ? 'border-brand bg-brand-muted/40' : 'hover:bg-muted/40',
                 )}
               >
                 {/* No aria-label here: the whole row is the checkbox's label,

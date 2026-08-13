@@ -129,7 +129,7 @@ function SortableRow({
       style={{ transform: CSS.Transform.toString(transform), transition }}
       className={cn(
         'bg-background flex items-center gap-2 rounded-lg border px-2 py-2',
-        isDragging && 'ring-primary/40 relative z-10 shadow-sm ring-2',
+        isDragging && 'ring-brand/50 relative z-10 shadow-sm ring-2',
       )}
     >
       <button

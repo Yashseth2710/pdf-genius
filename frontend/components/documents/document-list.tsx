@@ -53,9 +53,12 @@ export function DocumentList() {
 
   if (isPending) {
     return (
-      <ul className="space-y-2" aria-busy="true" aria-label="Loading documents">
+      <ul className="border-t" aria-busy="true" aria-label="Loading documents">
         {[0, 1, 2].map((row) => (
-          <li key={row} className="bg-muted/50 h-[68px] animate-pulse rounded-lg" />
+          <li key={row} className="border-b px-3 py-3">
+            <div className="bg-muted h-4 w-56 max-w-full animate-pulse rounded" />
+            <div className="bg-muted mt-2 h-3 w-24 animate-pulse rounded" />
+          </li>
         ))}
       </ul>
     )
@@ -63,9 +66,9 @@ export function DocumentList() {
 
   if (isError) {
     return (
-      <div role="alert" className="rounded-lg border border-dashed px-6 py-10 text-center">
+      <div role="alert" className="rounded-lg border border-dashed px-6 py-10">
         <p className="font-medium">Could not load your documents</p>
-        <p className="text-muted-foreground mt-1 text-sm">
+        <p className="text-muted-foreground mt-1 max-w-md text-sm">
           {error instanceof ApiError ? error.message : 'Something went wrong.'}
         </p>
         <Button variant="outline" size="sm" className="mt-4" onClick={() => void refetch()}>
@@ -77,12 +80,9 @@ export function DocumentList() {
 
   if (data.items.length === 0) {
     return (
-      <div className="rounded-xl border border-dashed px-6 py-14 text-center">
-        <span className="bg-muted mx-auto mb-4 flex size-12 items-center justify-center rounded-full">
-          <FileText className="text-muted-foreground size-6" aria-hidden />
-        </span>
-        <h3 className="font-medium">No documents yet</h3>
-        <p className="text-muted-foreground mt-1.5 text-sm">
+      <div className="rounded-lg border border-dashed px-6 py-12">
+        <h3 className="text-lg">No documents yet</h3>
+        <p className="text-muted-foreground mt-1.5 max-w-sm text-sm">
           Upload a PDF or an image above and it will appear here.
         </p>
       </div>
@@ -94,7 +94,7 @@ export function DocumentList() {
 
   return (
     <div className="space-y-4">
-      <ul className="space-y-2">
+      <ul className="border-t">
         {data.items.map((document) => (
           <DocumentRow
             key={document.id}
@@ -107,8 +107,8 @@ export function DocumentList() {
 
       {pageCount > 1 && (
         <nav className="flex items-center justify-between" aria-label="Pagination">
-          <p className="text-muted-foreground text-sm">
-            Page {currentPage} of {pageCount} — {data.total} documents
+          <p className="text-muted-foreground tabular text-sm">
+            Page {currentPage} of {pageCount}, {data.total} documents
           </p>
           <div className="flex gap-2">
             <Button
@@ -159,10 +159,12 @@ function DocumentRow({
   }
 
   return (
-    <li className="hover:bg-muted/40 relative flex items-center gap-3 rounded-lg border px-3 py-2.5 transition-colors">
-      <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
-        <Icon className="size-4" aria-hidden />
-      </span>
+    // A ruled row, and the file icon is just an icon. The tinted rounded square
+    // behind a small glyph is the most recognisable piece of generated-UI
+    // furniture, and down a list of twenty documents it is twenty coloured
+    // squares telling you nothing the filename did not.
+    <li className="hover:bg-muted/50 relative flex items-center gap-3 border-b px-3 py-3 transition-colors">
+      <Icon className="text-muted-foreground size-4 shrink-0" aria-hidden />
 
       <div className="min-w-0 flex-1">
         {/* The name is the way in to the document, which is where people
@@ -174,7 +176,7 @@ function DocumentRow({
         >
           {document.original_filename}
         </Link>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground tabular mt-0.5 text-xs">
           {formatBytes(document.file_size)}
           {pages ? ` · ${pages}` : ''}
         </p>

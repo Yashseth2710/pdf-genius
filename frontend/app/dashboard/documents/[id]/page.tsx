@@ -98,10 +98,8 @@ export default function DocumentPreviewPage() {
 
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="truncate text-2xl font-semibold tracking-tight">
-              {document.original_filename}
-            </h1>
-            <p className="text-muted-foreground mt-1 text-sm">
+            <h1 className="truncate text-3xl">{document.original_filename}</h1>
+            <p className="text-muted-foreground tabular mt-2 text-sm">
               {formatBytes(document.file_size)}
               {pages ? ` · ${pages}` : ''}
             </p>
@@ -155,7 +153,7 @@ export default function DocumentPreviewPage() {
           {document.mime_type === 'application/zip'
             ? 'This is an archive. Download it to see what is inside.'
             : document.mime_type.startsWith('image/')
-              ? 'No browser can display this kind of image, so it cannot be shown here — but it converts to PDF perfectly well. Download it to open it.'
+              ? 'No browser can display this kind of image, so it cannot be shown here. It converts to PDF perfectly well. Download it to open it.'
               : 'This kind of file cannot be shown here. Download it to open it.'}
         </p>
       )}
@@ -184,7 +182,7 @@ export default function DocumentPreviewPage() {
                 <button
                   type="button"
                   onClick={() => setOpenPage(pageNumber)}
-                  className="bg-background hover:border-primary/50 focus-visible:ring-ring block w-full rounded-xl border p-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
+                  className="bg-background hover:border-brand/60 focus-visible:ring-ring block w-full rounded-lg border p-2 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none"
                   aria-label={`View page ${pageNumber} full screen`}
                 >
                   <PageThumbnail

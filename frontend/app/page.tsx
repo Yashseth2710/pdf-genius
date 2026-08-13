@@ -1,40 +1,37 @@
-import { ArrowRight, Combine, FileImage, Minimize2, Scissors, Sparkles, Stamp } from 'lucide-react'
 import Link from 'next/link'
 
 import { SiteHeader } from '@/components/shared/site-header'
 import { buttonVariants } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 
+/**
+ * What the app does today, said plainly.
+ *
+ * Set as an index rather than a grid of cards: a name in one column and a
+ * sentence in the other, ruled off from each other. It is the contents page of
+ * a printed manual, which suits a product about documents, and it avoids the
+ * icon-tile-above-a-heading card that every generated landing page reaches for.
+ */
 const tools = [
   {
-    icon: Combine,
-    name: 'Merge PDFs',
-    description: 'Combine several documents into one, in the order you choose.',
+    name: 'Merge',
+    description: 'Join several PDFs into one file, in the order you put them in.',
   },
   {
-    icon: Scissors,
-    name: 'Split PDFs',
-    description: 'Pull out the pages you need, by range or one at a time.',
+    name: 'Split',
+    description: 'Pull out a range of pages, a handful you pick, or every page separately.',
   },
   {
-    icon: Minimize2,
+    name: 'Organise',
+    description: 'See every page at once, then reorder, turn or drop the ones you want.',
+  },
+  {
     name: 'Compress',
-    description: 'Shrink a file that is too large to send, without wrecking it.',
+    description: 'Make a file small enough to send, and see exactly how much came off.',
   },
   {
-    icon: FileImage,
-    name: 'Convert',
-    description: 'Images into a PDF, or pages back out as images.',
-  },
-  {
-    icon: Stamp,
-    name: 'Watermark',
-    description: 'Stamp a document before you share it with anyone.',
-  },
-  {
-    icon: Sparkles,
-    name: 'Ask your PDF',
-    description: 'Summarise a document, or ask it a question and get page references.',
+    name: 'Images to PDF',
+    description: 'Turn photos or scans into one PDF, a page each. Eight image formats.',
   },
 ]
 
@@ -44,95 +41,79 @@ export default function HomePage() {
       <SiteHeader />
 
       <main>
-        {/* Hero */}
-        <section className="relative overflow-hidden">
-          {/* A soft wash behind the hero rather than a heavy gradient block */}
-          <div
-            aria-hidden
-            className="from-primary/8 pointer-events-none absolute inset-0 bg-gradient-to-b via-transparent to-transparent"
-          />
-          <div className="relative mx-auto max-w-3xl px-4 py-24 text-center sm:px-6 sm:py-32">
-            <p className="text-muted-foreground mb-6 inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-medium">
-              <span className="bg-primary size-1.5 rounded-full" aria-hidden />
-              Free to use. No adverts.
-            </p>
-
-            <h1 className="text-4xl font-semibold tracking-tight text-balance sm:text-6xl">
-              Your PDFs. One powerful workspace.
+        {/* Ranged left, at reading width. A centred headline over a centred
+            paragraph over two centred buttons is the shape every generated
+            landing page arrives in, and it reads worse besides: the eye has to
+            find the start of each line again. */}
+        <section className="mx-auto max-w-5xl px-6 pt-16 pb-20 sm:px-8 sm:pt-24">
+          <div className="max-w-2xl">
+            <h1 className="text-4xl sm:text-5xl">
+              Merge, split and shrink PDFs without hunting for a website.
             </h1>
 
-            <p className="text-muted-foreground mx-auto mt-6 max-w-xl text-lg text-pretty">
-              Merge, split, compress, convert, analyse and understand your documents from one simple
-              platform — instead of five different websites.
+            <p className="text-muted-foreground mt-6 max-w-xl text-lg">
+              Upload a document once, then point any of the tools at it. Free to use, no adverts,
+              and nothing you upload is readable by anyone but you.
             </p>
 
-            <div className="mt-10 flex flex-col items-center justify-center gap-3 sm:flex-row">
+            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
               {/* Real links wearing the button styles. Rendering a Button
                   "as" a link makes Base UI announce it as role="button",
                   which is wrong for something that navigates. */}
               <Link
                 href="/register"
-                className={cn(buttonVariants({ size: 'lg' }), 'w-full sm:w-auto')}
+                className={cn(buttonVariants({ size: 'lg' }), 'h-11 px-5 text-base')}
               >
-                Get started
-                <ArrowRight aria-hidden />
+                Create an account
               </Link>
               <Link
                 href="#tools"
                 className={cn(
-                  buttonVariants({ size: 'lg', variant: 'outline' }),
-                  'w-full sm:w-auto',
+                  buttonVariants({ size: 'lg', variant: 'ghost' }),
+                  'h-11 px-5 text-base',
                 )}
               >
-                Explore tools
+                See the tools
               </Link>
             </div>
           </div>
         </section>
 
-        {/* Tools */}
-        <section id="tools" className="mx-auto max-w-6xl scroll-mt-20 px-4 pb-24 sm:px-6">
-          <div className="mb-12 text-center">
-            <h2 className="text-2xl font-semibold tracking-tight sm:text-3xl">
-              Everything you actually need
-            </h2>
-            <p className="text-muted-foreground mt-3">
-              The tools people reach for most, in one place.
-            </p>
-          </div>
+        <section id="tools" className="border-t">
+          <div className="mx-auto max-w-5xl scroll-mt-16 px-6 py-20 sm:px-8">
+            <h2 className="text-2xl">The tools</h2>
 
-          <ul className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {tools.map((tool) => (
-              <li
-                key={tool.name}
-                className="group hover:border-primary/30 rounded-xl border p-6 transition-colors hover:shadow-sm"
-              >
-                <span className="bg-primary/10 text-primary mb-4 flex size-10 items-center justify-center rounded-lg">
-                  <tool.icon className="size-5" aria-hidden />
-                </span>
-                <h3 className="font-medium">{tool.name}</h3>
-                <p className="text-muted-foreground mt-1.5 text-sm">{tool.description}</p>
-              </li>
-            ))}
-          </ul>
+            <dl className="mt-10">
+              {tools.map((tool) => (
+                <div
+                  key={tool.name}
+                  className="grid gap-1 border-t py-5 first:border-t-0 first:pt-0 sm:grid-cols-[12rem_1fr] sm:gap-8"
+                >
+                  <dt className="font-heading text-lg font-semibold">{tool.name}</dt>
+                  <dd className="text-muted-foreground max-w-lg">{tool.description}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
         </section>
 
-        {/* Privacy */}
         <section className="border-t">
-          <div className="mx-auto max-w-3xl px-4 py-20 text-center sm:px-6">
-            <h2 className="text-2xl font-semibold tracking-tight">Your documents stay yours</h2>
-            <p className="text-muted-foreground mt-4 text-pretty">
-              Files are private to your account and never publicly readable. Temporary files are
-              deleted as soon as an operation finishes, and you can delete anything you have
-              uploaded at any time.
-            </p>
+          <div className="mx-auto max-w-5xl px-6 py-20 sm:px-8">
+            <div className="max-w-xl">
+              <h2 className="text-2xl">Your documents stay yours</h2>
+              <p className="text-muted-foreground mt-5">
+                Files are private to your account and never publicly readable. The temporary copies
+                a tool makes while it works are deleted the moment it finishes, and you can delete
+                anything you have uploaded whenever you like.
+              </p>
+            </div>
           </div>
         </section>
       </main>
 
       <footer className="border-t">
-        <div className="text-muted-foreground mx-auto flex max-w-6xl flex-col items-center justify-between gap-2 px-4 py-8 text-sm sm:flex-row sm:px-6">
-          <p>PDF Genius — Everything PDF. One simple workspace.</p>
+        <div className="text-muted-foreground mx-auto flex max-w-5xl flex-col gap-2 px-6 py-10 text-sm sm:flex-row sm:items-center sm:justify-between sm:px-8">
+          <p>PDF Genius</p>
           <p>Built with Next.js and FastAPI.</p>
         </div>
       </footer>

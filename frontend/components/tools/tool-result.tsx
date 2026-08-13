@@ -53,7 +53,10 @@ export function ToolResult({
 
   return (
     <div
-      className="space-y-4 rounded-xl border border-green-600/30 bg-green-600/5 p-5"
+      // Not a green-tinted panel. A whole card washed in a status colour is
+      // shouting a thing the tick and the word "Done" already say, and it left
+      // the result rows sitting as bordered cards inside a bordered card.
+      className="bg-muted/40 space-y-4 rounded-lg border p-5"
       // Announced rather than silently appearing: the button that started this
       // is above the fold, and the result may not be. Named because dnd-kit
       // puts its own status region on the merge page, and two unnamed ones are
@@ -61,12 +64,12 @@ export function ToolResult({
       role="status"
       aria-label="Result"
     >
-      <div className="flex items-center gap-2 text-green-700 dark:text-green-500">
-        <CheckCircle2 className="size-5" aria-hidden />
-        <p className="font-medium">{many ? `Done — ${outputs.length} files` : 'Done'}</p>
+      <div className="flex items-center gap-2">
+        <CheckCircle2 className="text-success size-5" aria-hidden />
+        <p className="font-medium">{many ? `Done. ${outputs.length} files.` : 'Done'}</p>
       </div>
 
-      <ul className="space-y-2">
+      <ul className="border-t">
         {outputs.map((output) => (
           <ResultRow key={output.id} output={output} />
         ))}
@@ -93,7 +96,7 @@ export function ToolResult({
 
       <p className="text-muted-foreground text-xs">
         {many ? 'These files have' : 'This file has'} been saved to your documents, so you can come
-        back for {many ? 'them' : 'it'} later — or use {many ? 'them' : 'it'} in another tool.
+        back for {many ? 'them' : 'it'} later, or use {many ? 'them' : 'it'} in another tool.
       </p>
     </div>
   )
@@ -115,14 +118,12 @@ function ResultRow({ output }: { output: DocumentSummary }) {
   }
 
   return (
-    <li className="bg-background flex items-center gap-3 rounded-lg border px-3 py-2.5">
-      <span className="bg-primary/10 text-primary flex size-9 shrink-0 items-center justify-center rounded-lg">
-        <FileText className="size-4" aria-hidden />
-      </span>
+    <li className="flex items-center gap-3 border-b py-2.5">
+      <FileText className="text-muted-foreground size-4 shrink-0" aria-hidden />
 
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{output.original_filename}</p>
-        <p className="text-muted-foreground text-xs">
+        <p className="text-muted-foreground tabular mt-0.5 text-xs">
           {formatBytes(output.file_size)}
           {pages ? ` · ${pages}` : ''}
         </p>

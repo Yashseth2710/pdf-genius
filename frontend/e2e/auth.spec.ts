@@ -18,10 +18,12 @@ test('a visitor can register, sign out and sign back in', async ({ page }) => {
 
   await page.goto('/')
   await expect(
-    page.getByRole('heading', { name: 'Your PDFs. One powerful workspace.' }),
+    page.getByRole('heading', {
+      name: 'Merge, split and shrink PDFs without hunting for a website.',
+    }),
   ).toBeVisible()
 
-  await page.getByRole('link', { name: 'Get started' }).first().click()
+  await page.getByRole('link', { name: 'Sign up' }).first().click()
   await expect(page).toHaveURL(/\/register$/)
 
   await page.getByLabel('First name').fill('Ada')

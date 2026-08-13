@@ -18,15 +18,15 @@ export function LogoMark({ className }: { className?: string }) {
         className="fill-[#F3F4F6] dark:fill-[#E5E7EB]"
       />
       {/* The folded corner itself */}
-      <path d="M20 2l6 6h-6V2Z" className="fill-[#DC2626]" />
+      <path d="M20 2l6 6h-6V2Z" className="fill-brand" />
       {/* Badge across the lower half, echoing the PDF label */}
-      <rect x="3" y="17" width="20" height="9" rx="2" className="fill-[#DC2626]" />
+      <rect x="3" y="17" width="20" height="9" rx="2" className="fill-brand" />
       <text
         x="13"
         y="23.6"
         textAnchor="middle"
         className="fill-white"
-        style={{ font: '700 6.5px system-ui, sans-serif', letterSpacing: '0.03em' }}
+        style={{ font: '700 6.5px var(--font-sans), sans-serif', letterSpacing: '0.03em' }}
       >
         PDF
       </text>
@@ -39,13 +39,16 @@ export function Logo({ className, href = '/' }: { className?: string; href?: str
     <Link
       href={href}
       className={cn(
-        'group flex items-center gap-2.5 rounded-md font-semibold tracking-tight',
+        'group flex items-center gap-2.5 rounded-md',
         'focus-visible:ring-ring focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none',
         className,
       )}
     >
-      <LogoMark className="size-8 transition-transform group-hover:scale-105" />
-      <span className="text-base">PDF Genius</span>
+      <LogoMark className="size-7" />
+      {/* The wordmark wears the heading serif. It is the one place the brand
+          gets to speak in its own voice, and a name set in the same face as
+          the navigation beside it is not a wordmark, it is a label. */}
+      <span className="font-heading text-lg font-semibold">PDF Genius</span>
     </Link>
   )
 }
