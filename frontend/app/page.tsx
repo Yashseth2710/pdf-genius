@@ -47,7 +47,7 @@ export default function HomePage() {
             find the start of each line again. */}
         <section className="mx-auto max-w-5xl px-6 pt-16 pb-20 sm:px-8 sm:pt-24">
           <div className="max-w-2xl">
-            <h1 className="text-4xl sm:text-5xl">
+            <h1 className="text-3xl sm:text-5xl">
               Merge, split and shrink PDFs without hunting for a website.
             </h1>
 
@@ -56,7 +56,11 @@ export default function HomePage() {
               and nothing you upload is readable by anyone but you.
             </p>
 
-            <div className="mt-10 flex flex-col gap-3 sm:flex-row">
+            {/* `items-start`, so both buttons hug their labels at every width.
+                Stretched full-width on a phone, the ghost one loses its edges
+                and reads as a line of centred text floating under the filled
+                one, which also fights a page that is otherwise ranged left. */}
+            <div className="mt-10 flex flex-col items-start gap-3 sm:flex-row">
               {/* Real links wearing the button styles. Rendering a Button
                   "as" a link makes Base UI announce it as role="button",
                   which is wrong for something that navigates. */}

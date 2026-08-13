@@ -186,12 +186,26 @@
   h2,
   h3,
   h4 {
-    @apply font-heading leading-tight font-semibold text-pretty;
+    /* `text-balance`, not `text-pretty`: headings want their lines evened out
+       so the last one is not a single orphaned word. `text-pretty` is the
+       body-copy setting and only guards the final line. */
+    @apply font-heading leading-tight font-semibold text-balance;
   }
 
   /* Digits line up in a column: file sizes in a list, page numbers in a grid,
      percentages in the history. Proportional figures make those wander. */
   .tabular {
     font-variant-numeric: tabular-nums;
+  }
+
+  /* Light type on a dark ground optically blooms, so the same tracking that
+     reads as even in the light theme reads as tight here. A hair of extra
+     letter-spacing on body text puts it back. Headings are large enough not to
+     need it, and would look loose if they got it. */
+  .dark body {
+    letter-spacing: 0.006em;
+  }
+  .dark :is(h1, h2, h3, h4) {
+    letter-spacing: normal;
   }
 }

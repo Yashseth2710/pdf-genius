@@ -56,10 +56,10 @@ export function ToolStep({
 }) {
   return (
     <section className="sm:grid sm:grid-cols-[2rem_1fr] sm:gap-x-4">
-      <span
-        className="text-muted-foreground hidden font-mono text-sm leading-7 sm:block"
-        aria-hidden
-      >
+      {/* Not set in mono. Mono earns its place on code, data and measurement —
+          the byte counts in the compression result — and a single digit in it
+          is the typeface worn as a costume for "technical". */}
+      <span className="text-muted-foreground tabular hidden text-sm leading-7 sm:block" aria-hidden>
         {step}.
       </span>
 

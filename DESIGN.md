@@ -82,8 +82,19 @@ fact already on screen. Body leading is 1.6; headings tighten to 1.25 via
 drawn with the spacing it wants, and crushing it to look designed costs
 legibility and gains nothing.
 
-Numbers that sit in a column — file sizes down a list, page counts, percentages
-— take the `.tabular` utility so the digits line up.
+Numbers that sit in a column (file sizes down a list, page counts, percentages)
+take the `.tabular` utility so the digits line up.
+
+**Mono is for code, data and measurement**, never as a costume for "technical".
+In practice that means the byte counts in a compression result and nothing else.
+A single digit set in mono to look engineered is the costume.
+
+Headings take `text-balance` so their lines even out. Body copy takes
+`text-pretty`, which only guards the last line. They are not interchangeable.
+
+In dark mode body text gets `0.006em` of extra tracking. Light type on a dark
+ground optically blooms, so identical spacing reads tighter than it measures.
+Headings are large enough not to need it and look loose if they get it.
 
 ---
 
