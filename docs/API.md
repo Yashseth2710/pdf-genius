@@ -409,9 +409,26 @@ when `page_size` is `match`.
 
 ## Jobs
 
-### `GET /jobs?limit=20&offset=0&operation=MERGE`
+### `GET /jobs?limit=20&offset=0`
 
-Your processing history, newest first. `operation` is optional.
+Your processing history, newest first. Every filter is optional, and they
+combine:
+
+| Parameter | |
+| --- | --- |
+| `operation` | `MERGE`, `SPLIT`, `ORGANISE`, `COMPRESS`, `CONVERT`, … |
+| `status` | `COMPLETED`, `FAILED`, `PROCESSING`, `QUEUED` |
+| `date_from` | `YYYY-MM-DD` — from the **start** of that day |
+| `date_to` | `YYYY-MM-DD` — to the **end** of that day |
+
+Both dates are inclusive, which is how a range reads to the person choosing it:
+"the 3rd to the 5th" plainly includes the 5th. Comparing against the bare date
+would mean midnight, and would silently drop a day's work — a bug nobody
+reports, because nobody can see it.
+
+The list and the total are filtered by the same conditions, built once. Two
+queries that narrowed differently would give a paginator pages that are not
+there.
 
 ```jsonc
 {
@@ -450,9 +467,26 @@ Conversion is recorded as `CONVERT`, with `options.direction` naming which
 way it went — `images_to_pdf` today, and room for the reverse if it is ever
 added back.
 
+`document_id` is `null` for a job whose source document has since been deleted.
+The entry survives on purpose: **history outlives the documents it is about.**
+It used to cascade, so tidying up your files erased the record of the work —
+and a history missing entries is one nobody notices is wrong.
+
 ### `GET /jobs/{id}`
 
 One job. Someone else's job returns 404.
+
+### `DELETE /jobs/{id}`
+
+Forget that a job happened.
+
+```jsonc
+{ "success": true, "data": { "id": "…", "deleted": true } }
+```
+
+**Only the record goes.** Whatever the job produced stays in the user's
+documents: someone tidying their history has not asked to lose the files they
+made. Someone else's job returns 404 and is not deleted.
 
 ## Health
 
@@ -474,4 +508,4 @@ the database cannot be reached.
 
 ## Coming in later scopes
 
-`/tools/watermark` and `/ai/*` — see [ROADMAP.md](ROADMAP.md).
+`/ai/*` — see [ROADMAP.md](ROADMAP.md).

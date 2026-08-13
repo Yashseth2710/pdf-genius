@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/shared/theme-toggle'
 import { UserMenu } from '@/components/shared/user-menu'
 import { buttonVariants } from '@/components/ui/button'
 import { useAuth } from '@/hooks/use-auth'
+import { cn } from '@/lib/utils'
 
 /**
  * The one header, in both states. Signed out it sells the product; signed in it
@@ -22,12 +23,20 @@ export function SiteHeader() {
 
         <nav className="flex items-center gap-1 sm:gap-2" aria-label="Main">
           {isAuthenticated && (
-            <Link
-              href="/dashboard/tools"
-              className={buttonVariants({ variant: 'ghost', size: 'sm' })}
-            >
-              Tools
-            </Link>
+            <>
+              <Link
+                href="/dashboard/tools"
+                className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
+              >
+                Tools
+              </Link>
+              <Link
+                href="/dashboard/history"
+                className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}
+              >
+                History
+              </Link>
+            </>
           )}
 
           <ThemeToggle />
@@ -41,10 +50,10 @@ export function SiteHeader() {
           ) : (
             <>
               {/* Links, not buttons: they navigate. */}
-              <Link href="/login" className={buttonVariants({ variant: 'ghost', size: 'sm' })}>
+              <Link href="/login" className={cn(buttonVariants({ variant: 'ghost', size: 'sm' }))}>
                 Sign in
               </Link>
-              <Link href="/register" className={buttonVariants({ size: 'sm' })}>
+              <Link href="/register" className={cn(buttonVariants({ size: 'sm' }))}>
                 Get started
               </Link>
             </>

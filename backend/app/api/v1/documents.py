@@ -9,10 +9,9 @@ from fastapi.responses import StreamingResponse
 from app.api.deps import CurrentUser, DbSession, StorageDep
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
-from app.schemas.common import SuccessResponse
+from app.schemas.common import DeletedResponse, SuccessResponse
 from app.schemas.document import (
     ArchiveRequest,
-    DeletedResponse,
     DocumentListResponse,
     DocumentResponse,
 )

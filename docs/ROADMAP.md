@@ -22,9 +22,9 @@ A scope is finished only when all of this is true (spec section 64):
 | 5  | Merge and split           | M    | 4          | ✅ Done |
 | 6  | Page organisation         | L    | 5          | ✅ Done |
 | 7  | Compression and conversion| M    | 4          | ✅ Done |
-| 8  | Watermark                 | S    | 4          | Next   |
-| 9  | Dashboard and history     | M    | 5–8        |        |
-| 10 | AI features               | L    | 4          |        |
+| 8  | Watermark                 | S    | 4          | Dropped |
+| 9  | Dashboard and history     | M    | 5–7        | ✅ Done |
+| 10 | AI features               | L    | 4          | Next   |
 | 11 | Hardening                 | M    | 2–10       |        |
 | 12 | Deployment                | M    | 11         |        |
 
@@ -269,21 +269,66 @@ two of its three pages in one of the two page modes.
 
 ---
 
-## 8. Watermark
+## 8. Watermark — dropped
 
-Text watermark with configurable text, font size, opacity, position and
-rotation, applied to selected or all pages, with a live preview before
-processing.
+Text watermarking was planned here: configurable text, size, opacity, position
+and rotation, with a live preview. It is not being built.
+
+Not because it is hard - it was the smallest scope left, `WATERMARK` already
+exists in `OperationType` from scope 2, and it needed no migration and no new
+dependency. It is dropped because of what it is worth next to what follows.
+Eight tools already cover what people come to a PDF app to do; what separates
+this from a half-finished project now is the dashboard, the AI work, the
+hardening pass and *being deployed*. A ninth tool adds less to a finished
+product than the product being live.
+
+Nothing depends on it. `WATERMARK` stays in the enum unused, which costs
+nothing and leaves the door open. Scope 9 simply has one fewer operation to
+filter a history by.
 
 ---
 
-## 9. Dashboard and history
+## 9. Dashboard and history ✅
 
 The screen that turns a pile of tools into a product.
 
-- Dashboard: quick tools, recent documents, recent activity
-- History: filter by operation, date and status; paginated; delete entries
-- Empty states for a brand-new account
+**Shipped — backend:** `GET /jobs` gained status and date filters alongside the
+operation one, and they combine. Both dates are inclusive, because that is how
+a range reads to the person choosing it: "the 3rd to the 5th" includes the 5th.
+Comparing against the bare date means midnight and silently drops a day's work.
+`DELETE /jobs/{id}` removes one entry — **the record only**; whatever the job
+produced stays in the user's documents, because tidying a history is not a
+request to lose the work.
+
+The list and its total are built from one set of conditions. Two queries that
+narrowed differently would hand the paginator pages that are not there.
+
+**The migration this scope needed, which the plan had not foreseen:**
+`processing_jobs.document_id` cascaded. Deleting a PDF deleted every job that
+mentioned it — harmless while jobs were a debugging aid, wrong for a screen
+whose whole purpose is *what happened*. It is `SET NULL` now: the entry
+survives having forgotten which document it started from, which is the shape a
+merge has always had. Nobody notices a history that is quietly missing entries,
+which is exactly why it was worth fixing before the screen existed.
+
+**Shipped — frontend:** a history screen with all four filters, pagination and
+per-entry delete, and a dashboard carrying every tool as a shortcut plus the
+last five things you did.
+
+Each entry says *what the run did*, not just which tool it was: "Split pages
+1-3 into 2 files", "Compressed strong — 75% smaller (3.8 MB → 977 KB)",
+"12 pages into 9". That reading lives in one pure module with its own tests,
+because it is the only real logic on the screen — and because it has to survive
+options written by older versions of the app. A history that throws on last
+month's job is worse than one that says a little less about it.
+
+**Two empty states, not one.** An account that has never run anything and a
+filter that matched nothing look identical if you only count rows. Telling
+somebody to "try a tool" when they have used five reads as an app that is not
+paying attention.
+
+**Shipped — tests:** 7 for the date-range helpers, 11 backend integration,
+26 frontend, 8 end to end.
 
 ---
 

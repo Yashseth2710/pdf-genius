@@ -1,14 +1,30 @@
 'use client'
 
 import { useQueryClient } from '@tanstack/react-query'
-import { Combine, Scissors } from 'lucide-react'
+import { Combine, FileOutput, LayoutGrid, Minimize2, Scissors } from 'lucide-react'
 import Link from 'next/link'
 
 import { DocumentList } from '@/components/documents/document-list'
+import { RecentActivity } from '@/components/history/recent-activity'
 import { buttonVariants } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 import { UploadZone } from '@/components/upload/upload-zone'
 import { useAuth } from '@/hooks/use-auth'
+import { cn } from '@/lib/utils'
+
+/**
+ * Every tool, one click from the dashboard.
+ *
+ * The full set rather than a chosen few: there are only five, they fit on one
+ * line, and picking two for the reader is a decision that has to be right —
+ * whereas showing all of them cannot be wrong.
+ */
+const QUICK_TOOLS = [
+  { href: '/dashboard/tools/merge', icon: Combine, label: 'Merge PDFs' },
+  { href: '/dashboard/tools/split', icon: Scissors, label: 'Split a PDF' },
+  { href: '/dashboard/tools/organise', icon: LayoutGrid, label: 'Organise pages' },
+  { href: '/dashboard/tools/compress', icon: Minimize2, label: 'Compress' },
+  { href: '/dashboard/tools/images-to-pdf', icon: FileOutput, label: 'Images to PDF' },
+]
 
 export default function DashboardPage() {
   const { user } = useAuth()
@@ -25,22 +41,21 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Two shortcuts rather than the full quick-tools panel: that belongs
-          with the dashboard proper in scope 9, once there is more to show.
-
-          Wrapped in cn() rather than passed raw: the button's base sets
+      {/* Wrapped in cn() rather than passed raw: the button's base sets
           border-transparent and the outline variant sets border-border, and
           only tailwind-merge picks the winner. Without it both survive, the
           transparent one wins, and an outline button has no visible edge. */}
       <div className="flex flex-wrap gap-2">
-        <Link href="/dashboard/tools/merge" className={cn(buttonVariants({ variant: 'outline' }))}>
-          <Combine aria-hidden />
-          Merge PDFs
-        </Link>
-        <Link href="/dashboard/tools/split" className={cn(buttonVariants({ variant: 'outline' }))}>
-          <Scissors aria-hidden />
-          Split a PDF
-        </Link>
+        {QUICK_TOOLS.map((tool) => (
+          <Link
+            key={tool.href}
+            href={tool.href}
+            className={cn(buttonVariants({ variant: 'outline' }))}
+          >
+            <tool.icon aria-hidden />
+            {tool.label}
+          </Link>
+        ))}
       </div>
 
       <UploadZone
@@ -54,6 +69,10 @@ export default function DashboardPage() {
         <h2 className="text-lg font-medium tracking-tight">Your documents</h2>
         <DocumentList />
       </section>
+
+      {/* Below the documents, not above: this page is for uploading and
+          finding files, and what you did last week does not outrank that. */}
+      <RecentActivity />
     </div>
   )
 }

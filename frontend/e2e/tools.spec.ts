@@ -152,7 +152,10 @@ test('a merge result is saved as a document of its own', async ({ page }) => {
 
   await page.goto('/dashboard')
 
-  await expect(page.getByText('merged.pdf')).toBeVisible()
+  // The document row, specifically. The dashboard now names the file twice:
+  // once in the list, and once in the activity summary ("Merged 2 PDFs into
+  // merged.pdf"). Only the row is a link to the document itself.
+  await expect(page.getByRole('link', { name: 'merged.pdf' })).toBeVisible()
 })
 
 test('a PDF can be split by page range', async ({ page }) => {

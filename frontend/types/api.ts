@@ -152,6 +152,26 @@ export interface SplitInput {
   pages?: number[]
 }
 
+export interface JobListPage {
+  items: Job[]
+  total: number
+  limit: number
+  offset: number
+}
+
+/**
+ * How the history screen narrows what it shows.
+ *
+ * Dates are plain `YYYY-MM-DD` and inclusive at both ends — the server widens
+ * them to cover the whole day, so "the 3rd to the 5th" includes the 5th.
+ */
+export interface JobFilters {
+  operation?: OperationType
+  status?: JobStatus
+  date_from?: string
+  date_to?: string
+}
+
 export type CompressionLevel = 'basic' | 'balanced' | 'strong'
 
 export interface CompressInput {

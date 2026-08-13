@@ -28,9 +28,14 @@ class ProcessingJob(UUIDPrimaryKey, Timestamps, Base):
     )
     # Nullable because a merge has several inputs and no single source
     # document; the inputs are recorded in input_metadata instead.
+    #
+    # SET NULL rather than CASCADE: history has to outlive the documents it is
+    # about. Deleting a PDF used to delete every job that mentioned it, so
+    # tidying up erased the record of the work - silently, and in a way nobody
+    # notices until their history looks oddly short.
     document_id: Mapped[uuid.UUID | None] = mapped_column(
         UUID(as_uuid=True),
-        ForeignKey("documents.id", ondelete="CASCADE"),
+        ForeignKey("documents.id", ondelete="SET NULL"),
         index=True,
         nullable=True,
     )
