@@ -27,10 +27,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
-import pymupdf  # noqa: E402
+import pymupdf
 
-from app.services.pdf import operations  # noqa: E402
-from app.services.pdf.compress import CompressionLevel, compress  # noqa: E402
+from app.services.pdf import operations
+from app.services.pdf.compress import CompressionLevel, compress
 
 MB = 1024 * 1024
 
