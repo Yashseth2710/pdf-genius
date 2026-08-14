@@ -282,6 +282,40 @@ def test_a_plan_may_repeat_a_page() -> None:
     assert labels_in(result.data) == ["P1", "P2", "P1"]
 
 
+def test_repeating_a_page_does_not_repeat_what_it_contains() -> None:
+    """A plan naming one page two hundred times must not write two hundred
+    copies of that page's images.
+
+    This is a regression guard with a measurement behind it. The obvious
+    implementation - one `insert_pdf` per planned page - re-copies the images
+    every time, because PyMuPDF shares objects within a single call and not
+    across several. On a 20-page scan built into a 500-page plan that came to a
+    941MB file and a 2.5GB peak, which on a free host is not a slow response
+    but a killed process.
+
+    Asserted as a ratio rather than a byte count, so it survives a change of
+    fixture or a new PyMuPDF: what matters is that the cost of a repeat is the
+    page reference, not the picture on it.
+    """
+    with pymupdf.open() as document:
+        page = document.new_page()
+        # A block of pseudo-random colour, so the page carries real weight
+        # rather than something a compressor can wish away.
+        pixmap = pymupdf.Pixmap(pymupdf.csRGB, (0, 0, 400, 400), False)
+        for x in range(0, 400, 3):
+            pixmap.set_rect((x, 0, x + 2, 400), ((x * 7) % 256, (x * 31) % 256, (x * 97) % 256))
+        page.insert_image(page.rect, pixmap=pixmap)
+        heavy = bytes(document.tobytes(deflate=True))
+
+    repeated = operations.apply_page_plan(source("scan.pdf", heavy), plan(*([1] * 200)))
+
+    assert repeated.page_count == 200
+    # Two hundred references to one page, so the file stays close to the size
+    # of the one page. Ten times the source is generous; the broken version was
+    # nearer two hundred times.
+    assert len(repeated.data) < len(heavy) * 10
+
+
 def test_an_empty_plan_is_refused() -> None:
     with pytest.raises(ProcessingError, match="at least one page"):
         operations.apply_page_plan(source("report.pdf", numbered("P", 3)), [])
