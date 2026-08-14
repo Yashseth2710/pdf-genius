@@ -20,9 +20,16 @@ from app.core.errors import (
 from app.models import Document, User
 from app.models.enums import DocumentStatus
 from app.repositories.document import DocumentRepository
+from app.schemas.document import UploadTicket
 from app.services.files.validation import EXTENSIONS, PDF, SNIFF_BYTES, sniff
 from app.services.storage.base import Storage
-from app.services.storage.keys import new_document_key, new_output_key, safe_download_name
+from app.services.storage.keys import (
+    UnsafeStorageKeyError,
+    new_document_key,
+    new_output_key,
+    safe_download_name,
+    validate_key,
+)
 from app.services.storage.local import FileTooLargeInStorage
 
 logger = logging.getLogger(__name__)
@@ -143,6 +150,153 @@ class DocumentService:
             document.id,
             user.id,
             stored.size,
+            page_count,
+        )
+        return document
+
+    def issue_upload_ticket(
+        self,
+        *,
+        user: User,
+        filename: str,
+        claimed_size: int,
+        max_bytes: int,
+        quota_bytes: int | None = None,
+    ) -> "UploadTicket":
+        """Reserve a key for a browser to upload to, or refuse now.
+
+        The refusals here are a courtesy rather than a control: they save
+        someone a 25MB upload that was always going to be rejected. The
+        controls are in ``record_uploaded``, which sees the real bytes.
+
+        The extension comes from the filename, which is the uploader's text -
+        so it is used only to name the object, never to decide what the file
+        is. ``new_document_key`` sanitises it and the rest of the key is a
+        UUID we generate.
+        """
+        remaining = max_bytes
+        if quota_bytes is not None:
+            free = quota_bytes - self.documents.total_bytes_for_user(user.id)
+            if free <= 0:
+                raise StorageQuotaError(
+                    f"You have used all {quota_bytes // (1024 * 1024)}MB of your storage. "
+                    "Delete a document to free some space."
+                )
+            remaining = min(max_bytes, free)
+
+        if claimed_size > remaining:
+            if remaining < max_bytes:
+                raise StorageQuotaError(
+                    f"That file does not fit in your remaining "
+                    f"{remaining // (1024 * 1024)}MB of storage. "
+                    "Delete a document to free some space."
+                )
+            raise FileTooLargeError(f"That file is larger than {max_bytes // (1024 * 1024)}MB.")
+
+        suffix = safe_download_name(filename).rsplit(".", 1)
+        extension = suffix[1][:10] if len(suffix) == 2 and suffix[1].isalnum() else "bin"
+
+        return UploadTicket(key=new_document_key(user.id, extension), max_bytes=remaining)
+
+    def record_uploaded(
+        self,
+        *,
+        user: User,
+        key: str,
+        original_filename: str,
+        max_bytes: int,
+        allowed_mime_types: Sequence[str],
+        quota_bytes: int | None = None,
+    ) -> Document:
+        """Record a file the browser uploaded straight to object storage.
+
+        Used where the application never sees the upload: a serverless function
+        may not accept a body anywhere near the 25MB limit, so the browser
+        writes to storage directly and then tells us where it landed.
+
+        That means every check ``upload`` makes *while* writing has to be made
+        again here, against what actually arrived rather than against what the
+        client said it was sending. A caller that claims a small PDF and
+        uploads a large executable is refused at exactly the same points - the
+        difference is only that the file is deleted afterwards instead of never
+        being written.
+        """
+        # This is the first place a *client-supplied* key reaches validation -
+        # every other caller passes a key we generated. An unsafe one is
+        # answered as a missing file rather than as an error, because the
+        # difference between "malformed" and "not yours" is information.
+        try:
+            validate_key(key)
+        except UnsafeStorageKeyError as exc:
+            logger.warning("Refused an unsafe key from user=%s", user.id)
+            raise NotFoundError("That upload was not found.") from exc
+
+        # The only prefix this user could have been given. Without this check,
+        # an authenticated caller could name someone else's object and have it
+        # recorded as their own document.
+        if not key.startswith(f"documents/{user.id}/"):
+            raise NotFoundError("That upload was not found.")
+
+        if not self.storage.exists(key):
+            raise NotFoundError("That upload was not found.")
+
+        with self.storage.open(key) as handle:
+            data = handle.read()
+
+        # Every rejection below deletes first and raises second, so a refused
+        # upload never stays in the store. There is no `finally` doing this
+        # because a *successful* record must keep the file.
+        if not data:
+            self.storage.delete(key)
+            raise InvalidFileError("That file is empty.")
+
+        if len(data) > max_bytes:
+            self.storage.delete(key)
+            raise FileTooLargeError(f"That file is larger than {max_bytes // (1024 * 1024)}MB.")
+
+        file_type = sniff(data[:SNIFF_BYTES])
+        if file_type is None or file_type.mime not in allowed_mime_types:
+            self.storage.delete(key)
+            raise UnsupportedFileTypeError(
+                f"That file type is not supported. Upload {_accepted(allowed_mime_types)}."
+            )
+
+        # Checked after the fact here rather than as a ceiling on the write,
+        # because there was no write to put a ceiling on.
+        if quota_bytes is not None:
+            remaining = quota_bytes - self.documents.total_bytes_for_user(user.id)
+            if len(data) > remaining:
+                self.storage.delete(key)
+                raise StorageQuotaError(
+                    f"That file does not fit in your remaining "
+                    f"{max(0, remaining) // (1024 * 1024)}MB of storage. "
+                    "Delete a document to free some space."
+                )
+
+        page_count = self._inspect_pdf(key) if file_type.mime == PDF else None
+
+        document = Document(
+            user_id=user.id,
+            original_filename=original_filename[:255],
+            storage_path=key,
+            mime_type=file_type.mime,
+            file_size=len(data),
+            page_count=page_count,
+            status=DocumentStatus.READY,
+        )
+        try:
+            self.documents.add(document)
+            self.db.commit()
+        except Exception:
+            self.db.rollback()
+            self.storage.delete(key)
+            raise
+
+        logger.info(
+            "Recorded direct upload id=%s user=%s bytes=%d pages=%s",
+            document.id,
+            user.id,
+            len(data),
             page_count,
         )
         return document

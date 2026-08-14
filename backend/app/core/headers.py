@@ -8,6 +8,9 @@ This is an API, not a site: it returns JSON and file downloads, never HTML that
 a browser renders as a page. That makes the policy unusually strict — a
 document served from here should be able to do *nothing at all*. The frontend
 is a separate origin with its own headers, set by Next.
+
+With one exception, below: the interactive docs are HTML, and they only exist
+outside production.
 """
 
 from collections.abc import Awaitable, Callable
@@ -32,6 +35,25 @@ HSTS_MAX_AGE = 31_536_000
 # response posting anywhere.
 CONTENT_SECURITY_POLICY = (
     "default-src 'none'; frame-ancestors 'none'; form-action 'none'; base-uri 'none'"
+)
+
+# The one exception, and it is a real one: /docs and /redoc *are* HTML, served
+# by FastAPI itself, and Swagger UI loads its script and stylesheet from a CDN.
+# Under the policy above the browser blocks both and renders a blank page from
+# a perfectly good 200 - which is what happened, and cost an afternoon.
+#
+# Only the two documentation paths get this, and only where they exist at all:
+# both are switched off in production, so this policy is never sent there.
+DOCS_PATHS = frozenset({"/docs", "/redoc", "/docs/oauth2-redirect"})
+
+DOCS_CONTENT_SECURITY_POLICY = (
+    "default-src 'none'; "
+    "script-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; "
+    "img-src 'self' data: https://fastapi.tiangolo.com; "
+    # Swagger UI fetches the schema from this origin to draw itself.
+    "connect-src 'self'; "
+    "frame-ancestors 'none'; form-action 'none'; base-uri 'none'"
 )
 
 STATIC_HEADERS = {
@@ -72,6 +94,12 @@ def register_security_headers(app: FastAPI, settings: Settings) -> None:
 
         for header, value in STATIC_HEADERS.items():
             response.headers[header] = value
+
+        # Checked against the path rather than the response, because by here
+        # the docs page is just HTML like any other. Never in production: the
+        # routes do not exist there, so the strict policy stands.
+        if not settings.is_production and request.url.path in DOCS_PATHS:
+            response.headers["Content-Security-Policy"] = DOCS_CONTENT_SECURITY_POLICY
 
         if settings.is_production:
             response.headers["Strict-Transport-Security"] = (

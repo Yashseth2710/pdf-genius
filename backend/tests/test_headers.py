@@ -96,3 +96,38 @@ def test_the_real_application_is_actually_wired_up() -> None:
 
     assert headers["Content-Security-Policy"] == CONTENT_SECURITY_POLICY
     assert headers["X-Frame-Options"] == "DENY"
+
+
+def test_the_docs_page_may_load_its_own_assets() -> None:
+    """A blank docs page from a 200 response is the bug this prevents.
+
+    `default-src 'none'` is right for an API that serves JSON, and wrong for
+    the one HTML page FastAPI serves itself: Swagger UI fetches its script and
+    stylesheet from a CDN, and the strict policy blocks both. The page loads,
+    renders nothing, and reports no error anywhere the developer is looking.
+    """
+    headers = TestClient(create_app()).get("/docs").headers
+    policy = headers["Content-Security-Policy"]
+
+    assert "https://cdn.jsdelivr.net" in policy
+    assert "script-src" in policy
+    assert "style-src" in policy
+    # Relaxed, not abandoned: still nothing by default, still unframeable.
+    assert policy.startswith("default-src 'none'")
+    assert "frame-ancestors 'none'" in policy
+
+
+def test_relaxing_the_policy_applies_to_the_docs_alone() -> None:
+    """The exception is one page, not a hole in the API's policy."""
+    headers = TestClient(create_app()).get("/api/v1/health").headers
+
+    assert headers["Content-Security-Policy"] == CONTENT_SECURITY_POLICY
+    assert "jsdelivr" not in headers["Content-Security-Policy"]
+
+
+def test_production_never_relaxes_it() -> None:
+    """The docs routes do not exist in production, so the CDN allowance must
+    not be reachable there either - a 404 is still a response with headers."""
+    client = build_client(environment="production")
+
+    assert client.get("/docs").headers["Content-Security-Policy"] == CONTENT_SECURITY_POLICY

@@ -23,14 +23,66 @@ export async function deleteDocument(id: string): Promise<void> {
   await apiFetch(`/documents/${id}`, { method: 'DELETE', headers: authHeader() })
 }
 
+type UploadOptions = { onProgress?: (percent: number) => void; signal?: AbortSignal }
+
 /**
- * Uploads one file, reporting progress as it goes.
+ * Uploads one file, by whichever route this deployment supports.
+ *
+ * Two routes exist because the serverless host caps request bodies at 4.5MB,
+ * well under the 25MB a user is allowed to upload. Where that cap applies the
+ * browser writes to object storage itself and the API only records the result;
+ * where it does not — a normal server, and local development — the file goes
+ * through the API as it always has.
+ */
+export function uploadDocument(file: File, options: UploadOptions = {}): Promise<DocumentSummary> {
+  return DIRECT_UPLOADS ? uploadDirect(file, options) : uploadThroughApi(file, options)
+}
+
+const DIRECT_UPLOADS = process.env.NEXT_PUBLIC_DIRECT_UPLOADS === 'true'
+
+/**
+ * Browser straight to Blob, then a note to the API saying where it landed.
+ *
+ * Three steps rather than one, and each is a place this can be refused: the
+ * API reserves a key and can say no on quota; the token route confirms the key
+ * belongs to whoever is asking; and the record call reads the bytes that
+ * actually arrived before it writes a row. Nothing trusts the step before it.
+ */
+async function uploadDirect(
+  file: File,
+  { onProgress, signal }: UploadOptions,
+): Promise<DocumentSummary> {
+  const { upload } = await import('@vercel/blob/client')
+
+  const ticket = await apiFetch<{ key: string; max_bytes: number }>('/documents/upload-ticket', {
+    method: 'POST',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ filename: file.name, size: file.size }),
+  })
+
+  await upload(ticket.key, file, {
+    access: 'public',
+    handleUploadUrl: '/api/blob/upload',
+    clientPayload: tokenStore.get() ?? '',
+    abortSignal: signal,
+    onUploadProgress: ({ percentage }) => onProgress?.(Math.round(percentage)),
+  })
+
+  return apiFetch<DocumentSummary>('/documents/record', {
+    method: 'POST',
+    headers: { ...authHeader(), 'Content-Type': 'application/json' },
+    body: JSON.stringify({ key: ticket.key, filename: file.name }),
+  })
+}
+
+/**
+ * Uploads one file through the API, reporting progress as it goes.
  *
  * Uses XMLHttpRequest rather than fetch: fetch cannot report upload progress
  * in any browser we target, and a progress bar that jumps from 0 to 100 is
  * worse than none on a 20MB file over a slow connection.
  */
-export function uploadDocument(
+function uploadThroughApi(
   file: File,
   { onProgress, signal }: { onProgress?: (percent: number) => void; signal?: AbortSignal } = {},
 ): Promise<DocumentSummary> {

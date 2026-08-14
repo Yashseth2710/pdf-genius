@@ -1,3 +1,10 @@
+[tool.vercel]
+# Vercel would find `app/main.py` on its own - it is one of the entrypoints it
+# looks for, and it exports `app`. Naming it anyway means a future rename of
+# that module fails the deploy with a clear error instead of a 404 on every
+# route.
+entrypoint = "app.main:app"
+
 [tool.ruff]
 line-length = 100
 target-version = "py312"
@@ -56,6 +63,7 @@ module = [
     "tests.test_pdf_compress",
     "tests.test_pdf_images",
     "tests.integration.test_documents_api",
+    "tests.integration.test_direct_upload_api",
     "tests.integration.test_tools_api",
 ]
 disallow_untyped_calls = false

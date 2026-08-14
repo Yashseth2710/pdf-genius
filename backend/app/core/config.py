@@ -55,9 +55,23 @@ class Settings(BaseSettings):
     login_max_failures: int = 5
     login_lockout_minutes: int = 15
 
+    # --- Shared state ---
+    # Empty means in-process counters, which is correct for one long-running
+    # backend. On serverless it is not: instances are many and short-lived, so
+    # a per-process count is barely a limit at all. Point this at any Redis and
+    # the rate limits are enforced across every instance.
+    redis_url: str = ""
+
     # --- Storage ---
+    # "local" for a real filesystem, "blob" for Vercel Blob. Production is
+    # serverless and has no disk that survives an invocation, so it must be
+    # "blob" there - and the app should fail loudly on the wrong one rather
+    # than accept uploads into a directory that is about to vanish.
     storage_provider: str = "local"
     storage_root: Path = Path("./storage")
+    # Supplied by Vercel when a Blob store is linked to the project. Empty is
+    # correct for local development, where nothing reads it.
+    blob_read_write_token: str = ""
     max_upload_size_mb: int = 25
     # Total per account, uploads and results together. Nothing capped this
     # before: a single account could fill the disk one 25MB file at a time, and
