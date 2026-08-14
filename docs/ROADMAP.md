@@ -24,8 +24,8 @@ A scope is finished only when all of this is true (spec section 64):
 | 7  | Compression and conversion| M    | 4          | ✅ Done |
 | 8  | Watermark                 | S    | 4          | Dropped |
 | 9  | Dashboard and history     | M    | 5–7        | ✅ Done |
-| 10 | AI features               | L    | 4          | Next   |
-| 11 | Hardening                 | M    | 2–10       |        |
+| 10 | AI features               | L    | 4          | Dropped |
+| 11 | Hardening                 | M    | 2–9        | Next   |
 | 12 | Deployment                | M    | 11         |        |
 
 ---
@@ -278,9 +278,9 @@ Not because it is hard - it was the smallest scope left, `WATERMARK` already
 exists in `OperationType` from scope 2, and it needed no migration and no new
 dependency. It is dropped because of what it is worth next to what follows.
 Eight tools already cover what people come to a PDF app to do; what separates
-this from a half-finished project now is the dashboard, the AI work, the
-hardening pass and *being deployed*. A ninth tool adds less to a finished
-product than the product being live.
+this from a half-finished project now is the dashboard, the hardening pass and
+*being deployed*. A ninth tool adds less to a finished product than the product
+being live.
 
 Nothing depends on it. `WATERMARK` stays in the enum unused, which costs
 nothing and leaves the door open. Scope 9 simply has one fewer operation to
@@ -332,25 +332,33 @@ paying attention.
 
 ---
 
-## 10. AI features
+## 10. AI features — dropped
 
-Built last of the functional scopes, and strictly optional: with
-`AI_PROVIDER=none` every tool above keeps working and AI surfaces show an
-unavailable state (section 68).
+Text extraction, structured summaries, and ask-your-PDF with retrieval, page
+references and an explicit "not found in this document". It is not being built.
 
-- Text extraction with PyMuPDF and pdfplumber, including page boundaries
-- `AIService` abstraction — `summarize()`, `answer_question()`,
-  `generate_embedding()` — so the provider is configurable, not hard-coded
-- Summaries structured as Overview / Key points / Important information / Conclusion
-- Ask-your-PDF with retrieval over the document, answers grounded in its
-  contents, page references, and an explicit "not found in this document" when
-  the text does not support an answer
-- Sessions and messages persisted
+The open question here was always which provider, and it never had a good
+answer. A local model meant a multi-gigabyte download for a free app; an
+external API meant every document someone uploaded leaving our infrastructure
+to be read by a third party. But the provider was the wrong thing to be stuck
+on, because the feature underneath it does not belong here.
 
-**Open decision:** which provider. A local model keeps documents on our own
-infrastructure but means a multi-gigabyte download; an external API is lighter
-but sends document text off-site and needs a free tier to stay within budget.
-Worth deciding before this scope starts, not during it.
+This is a PDF utility. People arrive with a file and a problem — too big to
+email, pages in the wrong order, five scans that should be one document — and
+they leave when it is solved. Nobody comes to a tool like this to have a
+conversation with a document. Bolting a chat panel onto it would have been the
+largest scope in the project, the only part that sends user files off-site, and
+the only part that could be wrong while looking confident. Nine tools that do
+exactly what they say is a better product than nine tools and an assistant.
+
+Nothing depends on it. The scaffolding from scope 2 stays exactly as
+`WATERMARK` does: `ai_sessions` and `ai_messages` remain as empty tables, along
+with the `ai_session_type` and `message_role` enums, the `AISession` and
+`AIMessage` models, the `AI_PROVIDER` and `AI_MODEL` settings, and the
+`ai_enabled` field on `GET /health`, which now simply always reads `false`.
+None of it costs anything to keep, and it leaves the door open.
+
+Hardening is next, and it inherits one less surface to secure.
 
 ---
 

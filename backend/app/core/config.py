@@ -47,10 +47,22 @@ class Settings(BaseSettings):
     # Processing is CPU work, not a database read, so it gets its own limit.
     rate_limit_processing: str = "20/minute"
 
+    # --- Account lockout ---
+    # Per account rather than per address, which is what the rate limits above
+    # count. A spraying run spread over many addresses stays under every per-IP
+    # limit while hammering one inbox. Temporary rather than permanent: a
+    # permanent lock is itself a way to lock a real user out on purpose.
+    login_max_failures: int = 5
+    login_lockout_minutes: int = 15
+
     # --- Storage ---
     storage_provider: str = "local"
     storage_root: Path = Path("./storage")
     max_upload_size_mb: int = 25
+    # Total per account, uploads and results together. Nothing capped this
+    # before: a single account could fill the disk one 25MB file at a time, and
+    # on a free host that takes down the service for everyone.
+    storage_quota_mb: int = 500
     # Every image type the established converters take, so somebody arriving
     # with a phone photo or a scan is not turned away over a container format.
     allowed_upload_types: str = (
@@ -106,6 +118,10 @@ class Settings(BaseSettings):
     @property
     def max_upload_size_bytes(self) -> int:
         return self.max_upload_size_mb * 1024 * 1024
+
+    @property
+    def storage_quota_bytes(self) -> int:
+        return self.storage_quota_mb * 1024 * 1024
 
     @property
     def max_merge_total_bytes(self) -> int:

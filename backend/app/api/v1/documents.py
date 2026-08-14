@@ -42,6 +42,7 @@ def upload_document(
         original_filename=file.filename or "document",
         max_bytes=settings.max_upload_size_bytes,
         allowed_mime_types=settings.allowed_upload_type_list,
+        quota_bytes=settings.storage_quota_bytes,
     )
     return SuccessResponse(data=DocumentResponse.model_validate(document))
 

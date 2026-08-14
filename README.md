@@ -18,8 +18,8 @@ A student finishing an assignment often has to merge a few PDFs, compress the
 result, turn some photos into a document and drop a page. Doing that today
 usually means several sites, repeated uploads, adverts, file-size limits and no
 history of what happened. PDF Genius puts the whole workflow in one interface,
-keeps documents private to the account that uploaded them, and adds AI that can
-summarise a document or answer questions grounded in its contents.
+keeps documents private to the account that uploaded them, and remembers what
+was done to them.
 
 ## Tech stack
 
@@ -89,8 +89,11 @@ Both apps ship a `.env.example` listing every variable with a placeholder. Real
 | `JWT_SECRET`                  | Signing key for access tokens                    |
 | `CORS_ORIGINS`                | Comma-separated list of allowed frontend origins |
 | `STORAGE_ROOT`                | Where uploaded and processed files live          |
-| `MAX_UPLOAD_SIZE_MB`          | Upload size limit                                |
-| `AI_PROVIDER`                 | `none` disables AI; PDF tools are unaffected     |
+| `MAX_UPLOAD_SIZE_MB`          | Upload size limit, per file                      |
+| `STORAGE_QUOTA_MB`            | Total storage per account, uploads and results   |
+| `LOGIN_MAX_FAILURES`          | Failed sign-ins before an account is locked      |
+| `LOGIN_LOCKOUT_MINUTES`       | How long that lock lasts                         |
+| `AI_PROVIDER`                 | Unused. AI was dropped; leave it at `none`       |
 
 | Frontend              | Purpose                                     |
 | --------------------- | ------------------------------------------- |
@@ -162,13 +165,14 @@ each one delivers and when it counts as finished.
 - [x] **7** — Compression, and images into a PDF
 - [ ] ~~**8** — Text watermark~~ — dropped; see [ROADMAP.md](docs/ROADMAP.md)
 - [x] **9** — Dashboard and history
-- [ ] **10** — AI: text extraction, summaries, ask-your-PDF
+- [ ] ~~**10** — AI: summaries, ask-your-PDF~~ — dropped; see [ROADMAP.md](docs/ROADMAP.md)
 - [ ] **11** — Hardening: accessibility, security, performance
 - [ ] **12** — Deployment
 
 ## Privacy
 
 Documents belong to the account that uploaded them and are never publicly
-readable. Temporary processing files are deleted once an operation finishes. AI
-is optional and off by default; when a provider is configured, the data-handling
-implications are documented rather than hidden.
+readable. Temporary processing files are deleted once an operation finishes.
+Nothing you upload is sent to a third party: every tool runs on our own
+infrastructure, which is part of why the AI features were dropped rather than
+built.

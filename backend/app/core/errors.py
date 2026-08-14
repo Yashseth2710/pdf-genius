@@ -71,6 +71,19 @@ class FileTooLargeError(AppError):
     message = "The uploaded file is too large."
 
 
+class StorageQuotaError(AppError):
+    """The account has no room left.
+
+    413 rather than 507: the server has plenty of space, this account does not,
+    and the fix is for the user to delete something. 507 would say the service
+    is out of room, which is a different problem with a different owner.
+    """
+
+    status_code = status.HTTP_413_CONTENT_TOO_LARGE
+    code = "STORAGE_QUOTA_EXCEEDED"
+    message = "You have used all your storage. Delete a document to free some space."
+
+
 class UnsupportedFileTypeError(AppError):
     status_code = status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
     code = "UNSUPPORTED_FILE_TYPE"
