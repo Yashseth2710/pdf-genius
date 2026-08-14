@@ -1,10 +1,13 @@
 """Rate limiting for the endpoints worth attacking.
 
-In-memory counters, per process. That is deliberate: a single backend process
-needs no shared store, and adding Redis purely to count requests would break
-the free-first constraint (spec sections 52 and 67). If the backend is ever
-scaled to several processes, the limits become per-process and this should be
-revisited.
+In-memory counters when there is one process, which is the right answer for a
+single backend and keeps the free-first constraint (spec sections 52 and 67).
+
+That stops being true on serverless. Vercel runs many instances and recycles
+them constantly, so per-process counters mean the limit is really "N attempts
+per instance, until that instance goes away" - which is not a limit. Setting
+REDIS_URL moves the counters to a store every instance shares, and the limits
+mean again what they say.
 """
 
 from fastapi import FastAPI, Request
@@ -14,9 +17,15 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
 
+from app.core.config import get_settings
 from app.core.errors import error_body
 
-limiter = Limiter(key_func=get_remote_address, default_limits=[])
+# "memory://" is slowapi's own default and is what development uses.
+limiter = Limiter(
+    key_func=get_remote_address,
+    default_limits=[],
+    storage_uri=get_settings().redis_url or "memory://",
+)
 
 
 def register_rate_limiting(app: FastAPI) -> None:

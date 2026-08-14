@@ -39,3 +39,14 @@ class Storage(ABC):
 
     @abstractmethod
     def exists(self, key: str) -> bool: ...
+
+    def url_for(self, key: str) -> str | None:
+        """A URL the browser can fetch directly, if this backend has one.
+
+        ``None`` - the default, and the honest answer for a filesystem - means
+        the bytes have to come back through us. Object storage answers with a
+        URL so a download need not pass through the application at all, which
+        matters on a host that caps response bodies well below the upload
+        limit. Callers still authorise the request before asking.
+        """
+        return None

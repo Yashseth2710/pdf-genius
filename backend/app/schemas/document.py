@@ -33,6 +33,30 @@ class DocumentListResponse(BaseModel):
     offset: int
 
 
+class UploadTicketRequest(BaseModel):
+    """Asking permission to upload straight to object storage."""
+
+    filename: str = Field(min_length=1, max_length=255)
+    # What the browser believes it is about to send. Treated as a hint for
+    # naming and an early rejection only: the real type is read from the bytes
+    # once they have landed, which is the check that counts.
+    size: int = Field(ge=1)
+
+
+class UploadTicket(BaseModel):
+    """Where the browser may write, and what it may write there."""
+
+    key: str
+    max_bytes: int
+
+
+class RecordUploadRequest(BaseModel):
+    """Telling us an upload finished, so it can be checked and recorded."""
+
+    key: str = Field(min_length=1, max_length=512)
+    filename: str = Field(min_length=1, max_length=255)
+
+
 class ArchiveRequest(BaseModel):
     """Documents to bundle into one download.
 

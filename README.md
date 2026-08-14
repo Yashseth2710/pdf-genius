@@ -166,13 +166,23 @@ each one delivers and when it counts as finished.
 - [ ] ~~**8** — Text watermark~~ — dropped; see [ROADMAP.md](docs/ROADMAP.md)
 - [x] **9** — Dashboard and history
 - [ ] ~~**10** — AI: summaries, ask-your-PDF~~ — dropped; see [ROADMAP.md](docs/ROADMAP.md)
-- [ ] **11** — Hardening: accessibility, security, performance
-- [ ] **12** — Deployment
+- [x] **11** — Hardening: accessibility, security, performance
+- [x] **12** — Deployment: both halves on Vercel, files on Vercel Blob — see [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)
 
 ## Privacy
 
-Documents belong to the account that uploaded them and are never publicly
-readable. Temporary processing files are deleted once an operation finishes.
+Documents belong to the account that uploaded them, and every endpoint that
+touches one checks ownership first. Temporary processing files are deleted once
+an operation finishes.
+
+One honest qualification for the hosted deployment. Files there live in object
+storage under a random UUID, and a download is a redirect to that address rather
+than bytes served through the API — because the platform will not return a
+response over 4.5MB, and documents are allowed to be 25MB. The address is
+unguessable but unsigned, so **anyone who obtains a document's storage URL can
+read it without signing in**, in the way an "anyone with the link" share works.
+Run it yourself with `STORAGE_PROVIDER=local` and downloads are authorised in
+full. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 Nothing you upload is sent to a third party: every tool runs on our own
 infrastructure, which is part of why the AI features were dropped rather than
 built.

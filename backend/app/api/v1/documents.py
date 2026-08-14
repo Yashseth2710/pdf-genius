@@ -3,8 +3,8 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, File, Query, Request, UploadFile, status
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, File, Query, Request, Response, UploadFile, status
+from fastapi.responses import RedirectResponse, StreamingResponse
 
 from app.api.deps import CurrentUser, DbSession, StorageDep
 from app.core.config import get_settings
@@ -14,6 +14,9 @@ from app.schemas.document import (
     ArchiveRequest,
     DocumentListResponse,
     DocumentResponse,
+    RecordUploadRequest,
+    UploadTicket,
+    UploadTicketRequest,
 )
 from app.services.files.service import DocumentService
 from app.services.storage.keys import safe_download_name
@@ -40,6 +43,62 @@ def upload_document(
         user=current_user,
         stream=file.file,
         original_filename=file.filename or "document",
+        max_bytes=settings.max_upload_size_bytes,
+        allowed_mime_types=settings.allowed_upload_type_list,
+        quota_bytes=settings.storage_quota_bytes,
+    )
+    return SuccessResponse(data=DocumentResponse.model_validate(document))
+
+
+@router.post(
+    "/upload-ticket",
+    response_model=SuccessResponse[UploadTicket],
+    summary="Ask permission to upload directly to storage",
+)
+@limiter.limit(settings.rate_limit_upload)
+def request_upload_ticket(
+    request: Request,
+    payload: UploadTicketRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+    storage: StorageDep,
+) -> SuccessResponse[UploadTicket]:
+    """Reserve a storage key for a file the browser will upload itself.
+
+    Needed because a serverless function cannot accept a 25MB body. Nothing is
+    trusted here: the size is the client's claim, checked so an upload that
+    obviously cannot fit is refused before it is made rather than after, and
+    checked again for real once the bytes exist.
+    """
+    ticket = DocumentService(db, storage).issue_upload_ticket(
+        user=current_user,
+        filename=payload.filename,
+        claimed_size=payload.size,
+        max_bytes=settings.max_upload_size_bytes,
+        quota_bytes=settings.storage_quota_bytes,
+    )
+    return SuccessResponse(data=ticket)
+
+
+@router.post(
+    "/record",
+    response_model=SuccessResponse[DocumentResponse],
+    status_code=status.HTTP_201_CREATED,
+    summary="Record a direct upload",
+)
+@limiter.limit(settings.rate_limit_upload)
+def record_upload(
+    request: Request,
+    payload: RecordUploadRequest,
+    current_user: CurrentUser,
+    db: DbSession,
+    storage: StorageDep,
+) -> SuccessResponse[DocumentResponse]:
+    """Check what actually landed in storage, then record it."""
+    document = DocumentService(db, storage).record_uploaded(
+        user=current_user,
+        key=payload.key,
+        original_filename=payload.filename,
         max_bytes=settings.max_upload_size_bytes,
         allowed_mime_types=settings.allowed_upload_type_list,
         quota_bytes=settings.storage_quota_bytes,
@@ -134,8 +193,8 @@ def download_document(
     current_user: CurrentUser,
     db: DbSession,
     storage: StorageDep,
-) -> StreamingResponse:
-    """Stream the stored file back.
+) -> Response:
+    """Stream the stored file back, or redirect to where it lives.
 
     The client asks for a document by id; it never names a path. The filename
     in the header is the user's original one, cleaned so it cannot break the
@@ -144,6 +203,14 @@ def download_document(
     service = DocumentService(db, storage)
     document = service.get_owned(document_id, current_user)
     filename = safe_download_name(document.original_filename)
+
+    # Ownership has been checked above either way. When storage can serve the
+    # file itself, hand the browser a URL rather than copying the bytes through
+    # this process: a serverless function may not return a body larger than
+    # 4.5MB, which is well under the 25MB a user is allowed to upload.
+    direct = storage.url_for(document.storage_path)
+    if direct is not None:
+        return RedirectResponse(direct, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
 
     return StreamingResponse(
         service.open_stream(document),

@@ -1,5 +1,6 @@
 """Shared FastAPI dependencies."""
 
+from functools import lru_cache
 from typing import Annotated
 
 from fastapi import Depends
@@ -12,7 +13,7 @@ from app.core.errors import AuthenticationError
 from app.core.security import decode_access_token
 from app.models import User
 from app.services.auth import AuthService
-from app.services.storage import LocalStorage, Storage
+from app.services.storage import LocalStorage, Storage, VercelBlobStorage
 
 # auto_error=False so a missing header raises our own error, in our own
 # envelope, rather than FastAPI's default JSON shape.
@@ -45,13 +46,26 @@ def get_current_user(
 CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
+@lru_cache
 def get_storage() -> Storage:
-    """The storage backend.
+    """The storage backend named by STORAGE_PROVIDER.
 
-    Local disk today. Swapping in object storage means returning a different
-    implementation here, with no route or service changing.
+    Local disk in development, Vercel Blob in production - a serverless
+    function has no persistent disk, so `local` there would lose every
+    document the moment the instance recycled.
+
+    Cached because the blob provider holds an HTTP client, and building one per
+    request would pay a TLS handshake per request.
     """
-    return LocalStorage(get_settings().storage_root)
+    settings = get_settings()
+    provider = settings.storage_provider.lower()
+
+    if provider == "local":
+        return LocalStorage(settings.storage_root)
+    if provider == "blob":
+        return VercelBlobStorage(settings.blob_read_write_token)
+
+    raise ValueError(f"Unknown STORAGE_PROVIDER: {settings.storage_provider!r}")
 
 
 StorageDep = Annotated[Storage, Depends(get_storage)]

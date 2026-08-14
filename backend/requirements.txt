@@ -28,8 +28,11 @@ pillow
 # Reads HEIC, which is what an iPhone writes by default.
 pillow-heif
 
-# --- Rate limiting (in-memory, no Redis) ---
+# --- Rate limiting ---
+# In-memory by default. `redis` is only imported when REDIS_URL is set, which
+# is how a serverless deployment gets limits that hold across instances.
 slowapi
+redis
 
 # --- HTTP client (AI providers, health checks) ---
 httpx

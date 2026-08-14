@@ -405,13 +405,37 @@ password in the connection it failed to open.
 
 ## 12. Deployment
 
-- Frontend to Vercel; backend to a free host; database already on Neon
-- Production environment variables, CORS locked to the real origin, HTTPS
-- Migrations run against production
-- `DEPLOYMENT.md`, plus screenshots in the README
+Both halves go to Vercel, as two projects over one repository. That was a
+deliberate choice over a conventional server for the backend, and it cost more
+than a config file: a Vercel function has no disk and will not carry a request
+body over 4.5MB, and the backend had assumed both.
 
-**Watch out for:** free backend hosts sleep when idle, so the first request
-after a quiet spell is slow. Document it rather than pretending otherwise.
+**Shipped — storage.** A `VercelBlobStorage` behind the `Storage` interface
+that already existed, so no route or service changed. `STORAGE_PROVIDER`
+selects it. Local disk stays the right answer in development.
+
+**Shipped — uploads.** The browser now writes to Blob itself and the API
+records the result, because 25MB will never fit through a 4.5MB cap. The check
+that mattered survived the move: the API still identifies the file from its
+bytes rather than from what the browser called it, only now it reads them back
+out of storage and deletes anything it refuses.
+
+**Shipped — downloads.** A 307 to the object rather than bytes through the
+function, which the same 4.5MB cap applies to. Written down as a real trade
+rather than a free one: the URL is unguessable but unsigned and unexpiring, so
+anyone holding one can fetch that file.
+
+**Shipped — limits.** `REDIS_URL` moves the rate limiter's counters somewhere
+every instance can see. Without it the limits are per-instance on a host that
+recycles instances constantly, which is barely a limit.
+
+**Outstanding, and not pretended otherwise:** the account lockout is still
+in-process, so scope 11's "five failures buys fifteen minutes" is weaker here
+than it was on one server. Orphaned Blob objects — uploaded but never recorded
+— are not collected.
+
+**Watch out for:** cold starts. An idle function pays PyMuPDF's import cost on
+the next request. Documented in `DEPLOYMENT.md` rather than hidden.
 
 ---
 
