@@ -14,6 +14,7 @@ from app.core.errors import (
     FileTooLargeError,
     InvalidFileError,
     NotFoundError,
+    StorageQuotaError,
     UnsupportedFileTypeError,
 )
 from app.models import Document, User
@@ -57,6 +58,7 @@ class DocumentService:
         original_filename: str,
         max_bytes: int,
         allowed_mime_types: Sequence[str],
+        quota_bytes: int | None = None,
     ) -> Document:
         """Take an uploaded file, check it is what it claims, and store it.
 
@@ -75,11 +77,35 @@ class DocumentService:
                 f"That file type is not supported. Upload {_accepted(allowed_mime_types)}."
             )
 
+        # The quota becomes a second ceiling on this one write, so an upload
+        # that would overrun it aborts mid-stream exactly as an oversized one
+        # does. Checking afterwards would mean writing the whole file to disk
+        # to discover there was no room for it - which is the thing the quota
+        # exists to prevent.
+        ceiling = max_bytes
+        if quota_bytes is not None:
+            remaining = quota_bytes - self.documents.total_bytes_for_user(user.id)
+            if remaining <= 0:
+                raise StorageQuotaError(
+                    f"You have used all {quota_bytes // (1024 * 1024)}MB of your storage. "
+                    "Delete a document to free some space."
+                )
+            ceiling = min(max_bytes, remaining)
+
         key = new_document_key(user.id, file_type.extension)
 
         try:
-            stored = self.storage.save(stream, key=key, max_bytes=max_bytes)
+            stored = self.storage.save(stream, key=key, max_bytes=ceiling)
         except FileTooLargeInStorage as exc:
+            # Both limits abort the same way, so which one was hit is decided
+            # by which one was lower. Saying "larger than 25MB" to someone with
+            # 3MB of room left would send them looking for the wrong problem.
+            if ceiling < max_bytes:
+                raise StorageQuotaError(
+                    f"That file does not fit in your remaining "
+                    f"{ceiling // (1024 * 1024)}MB of storage. "
+                    "Delete a document to free some space."
+                ) from exc
             raise FileTooLargeError(
                 f"That file is larger than {max_bytes // (1024 * 1024)}MB."
             ) from exc
@@ -129,6 +155,7 @@ class DocumentService:
         filename: str,
         mime_type: str,
         page_count: int | None,
+        quota_bytes: int | None = None,
     ) -> Document:
         """Save a file we produced as a document in its own right.
 
@@ -142,6 +169,19 @@ class DocumentService:
         """
         extension = EXTENSIONS.get(mime_type, "bin")
         key = new_output_key(user.id, extension)
+
+        # Results count against the quota too, or the cap would be trivial to
+        # walk past: split a 20MB PDF into a hundred pages and the account is
+        # holding twice what it uploaded. Checked before the write rather than
+        # streamed against a ceiling like an upload is, because this file is
+        # already in memory and its size is known exactly.
+        if quota_bytes is not None:
+            used = self.documents.total_bytes_for_user(user.id)
+            if used + len(data) > quota_bytes:
+                raise StorageQuotaError(
+                    "There is not enough room in your storage for the result. "
+                    "Delete a document and run this again."
+                )
 
         # No size check against the upload limit here: this file is ours, not
         # the client's, and the ceiling on it was applied to the inputs.

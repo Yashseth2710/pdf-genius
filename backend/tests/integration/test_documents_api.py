@@ -10,8 +10,12 @@ import pymupdf
 import pytest
 from fastapi.testclient import TestClient
 from httpx import Response
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
+from app.models import Document
+from app.repositories.document import DocumentRepository
 from app.services.storage.local import LocalStorage
 
 UPLOAD = "/api/v1/documents/upload"
@@ -130,6 +134,73 @@ def test_a_file_over_the_limit_is_refused(
 
     assert response.status_code == 413
     assert response.json()["error"]["code"] == "FILE_TOO_LARGE"
+
+
+def test_an_account_at_its_quota_cannot_upload(
+    authed_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = get_settings()
+    assert upload(authed_client, make_pdf(), "first.pdf", "application/pdf").status_code == 201
+
+    # A quota of zero means whatever is already stored has filled it.
+    monkeypatch.setattr(settings, "storage_quota_mb", 0)
+    response = upload(authed_client, make_pdf(), "second.pdf", "application/pdf")
+
+    assert response.status_code == 413
+    assert response.json()["error"]["code"] == "STORAGE_QUOTA_EXCEEDED"
+
+
+def test_the_quota_names_itself_rather_than_the_upload_limit(
+    authed_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Both limits abort the write the same way. Telling somebody with 3MB of
+    room that their file is 'larger than 25MB' sends them after the wrong
+    problem."""
+    settings = get_settings()
+    monkeypatch.setattr(settings, "storage_quota_mb", 0)
+
+    response = upload(authed_client, make_pdf(), "any.pdf", "application/pdf")
+
+    assert response.json()["error"]["code"] == "STORAGE_QUOTA_EXCEEDED"
+    assert "storage" in response.json()["error"]["message"].lower()
+
+
+def test_the_quota_counts_one_account_not_the_table(authed_client: TestClient, db: Session) -> None:
+    """Measured directly rather than through two uploads and a quota: a test
+    PDF is about a kilobyte, so any quota small enough to block one account
+    would be measured in bytes, and the setting is in megabytes."""
+    upload(authed_client, make_pdf(), "mine.pdf", "application/pdf")
+    upload(authed_client, make_pdf(3), "mine-too.pdf", "application/pdf")
+    other_token = second_user(authed_client)
+    authed_client.post(
+        UPLOAD,
+        files={"file": ("theirs.pdf", make_pdf(), "application/pdf")},
+        headers={"Authorization": f"Bearer {other_token}"},
+    )
+
+    documents = DocumentRepository(db)
+    users = db.execute(select(Document.user_id).distinct()).scalars().all()
+    totals = [documents.total_bytes_for_user(user_id) for user_id in users]
+
+    assert len(totals) == 2
+    # Each account is counted on its own, so neither total is the sum of both.
+    assert sum(totals) != max(totals)
+
+
+def test_deleting_a_document_frees_the_room_again(
+    authed_client: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    settings = get_settings()
+    first = upload(authed_client, make_pdf(), "first.pdf", "application/pdf")
+    document_id = first.json()["data"]["id"]
+
+    monkeypatch.setattr(settings, "storage_quota_mb", 0)
+    assert upload(authed_client, make_pdf(), "no.pdf", "application/pdf").status_code == 413
+
+    authed_client.delete(f"{DOCUMENTS}/{document_id}")
+    monkeypatch.setattr(settings, "storage_quota_mb", 500)
+
+    assert upload(authed_client, make_pdf(), "yes.pdf", "application/pdf").status_code == 201
 
 
 def test_nothing_is_left_on_disk_when_a_file_is_rejected(

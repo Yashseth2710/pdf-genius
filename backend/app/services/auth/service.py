@@ -6,7 +6,9 @@ import uuid
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.errors import AuthenticationError, ConflictError
+from app.core.lockout import LoginLockout
 from app.core.security import hash_password, needs_rehash, verify_password
 from app.models import User
 from app.repositories.user import UserRepository, normalise_email
@@ -17,6 +19,14 @@ logger = logging.getLogger(__name__)
 # Shown for both a wrong password and an unknown address, so the response
 # cannot be used to work out which email addresses have accounts.
 INVALID_CREDENTIALS = "Incorrect email or password."
+
+_settings = get_settings()
+# Process-wide, like the rate limiter: one counter shared by every request,
+# not one per AuthService instance, which would forget on the next request.
+login_lockout = LoginLockout(
+    max_failures=_settings.login_max_failures,
+    lock_minutes=_settings.login_lockout_minutes,
+)
 
 # Verified against when no user matches, purely so that a failed sign-in takes
 # about as long either way. Without it, the difference between "no such user"
@@ -60,15 +70,32 @@ class AuthService:
         return user
 
     def authenticate(self, data: LoginRequest) -> User:
+        # Checked before the account is looked up, and counted for any address
+        # whether or not it exists. If lockout applied only to real accounts,
+        # an address that never locks would be an address with no account —
+        # which is the exact thing the shared error message above exists to
+        # keep secret.
+        waiting = login_lockout.seconds_remaining(data.email)
+        if waiting > 0:
+            raise AuthenticationError(
+                f"Too many failed sign-in attempts. Try again in "
+                f"{max(1, round(waiting / 60))} minutes.",
+                code="ACCOUNT_LOCKED",
+            )
+
         user = self.users.get_by_email(data.email)
 
         if user is None:
             # Spend the same effort as a real check before failing.
             verify_password(data.password, _DUMMY_HASH)
+            login_lockout.record_failure(data.email)
             raise AuthenticationError(INVALID_CREDENTIALS, code="INVALID_CREDENTIALS")
 
         if not verify_password(data.password, user.password_hash):
+            login_lockout.record_failure(data.email)
             raise AuthenticationError(INVALID_CREDENTIALS, code="INVALID_CREDENTIALS")
+
+        login_lockout.record_success(data.email)
 
         # Transparently upgrade the stored hash if the cost parameters have
         # been raised since this password was set.

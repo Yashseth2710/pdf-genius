@@ -12,6 +12,7 @@ from app import __version__
 from app.api.v1.router import api_router
 from app.core.config import Settings, get_settings
 from app.core.errors import register_exception_handlers
+from app.core.headers import register_security_headers
 from app.core.rate_limit import register_rate_limiting
 
 API_PREFIX = "/api/v1"
@@ -82,6 +83,11 @@ def create_app() -> FastAPI:
     )
 
     register_rate_limiting(app)
+    # Added after the rate limiter, so it wraps it: Starlette runs the
+    # most-recently-added middleware outermost. That ordering is what puts the
+    # headers on a 429, which the rate limiter returns without the routes ever
+    # being reached.
+    register_security_headers(app, settings)
     register_request_logging(app)
     register_exception_handlers(app)
     app.include_router(api_router, prefix=API_PREFIX)

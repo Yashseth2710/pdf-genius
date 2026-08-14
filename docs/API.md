@@ -498,14 +498,17 @@ Liveness. Touches nothing external, so it never flaps.
 { "success": true, "data": { "status": "ok", "version": "0.1.0", "environment": "development", "ai_enabled": false } }
 ```
 
-`ai_enabled` lets the frontend hide AI features rather than letting a user
-click something that cannot work.
+`ai_enabled` always reads `false`. It was meant to let the frontend hide AI
+features rather than letting a user click something that cannot work; the AI
+scope was dropped, so nothing reads it. It stays in the response because
+removing a field is a breaking change for a gain of one boolean.
 
 ### `GET /health/ready`
 
 Readiness. Runs `SELECT 1`; returns 503 with `"database": "unavailable"` when
 the database cannot be reached.
 
-## Coming in later scopes
+## Not coming
 
-`/ai/*` — see [ROADMAP.md](ROADMAP.md).
+`/ai/*` was planned and has been dropped. Every endpoint this API will ever
+have is documented above. See [ROADMAP.md](ROADMAP.md) for why.

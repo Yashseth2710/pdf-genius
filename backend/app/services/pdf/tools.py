@@ -417,6 +417,7 @@ class ToolService:
             filename=filename,
             mime_type=mime_type,
             page_count=output.page_count if mime_type == PDF else None,
+            quota_bytes=self.settings.storage_quota_bytes,
         )
 
     def _store_all(self, user: User, outputs: list[OutputFile]) -> list[Document]:
