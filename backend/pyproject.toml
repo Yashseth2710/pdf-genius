@@ -63,6 +63,7 @@ module = [
     "tests.test_pdf_compress",
     "tests.test_pdf_images",
     "tests.integration.test_documents_api",
+    "tests.integration.test_direct_upload_api",
     "tests.integration.test_tools_api",
 ]
 disallow_untyped_calls = false
