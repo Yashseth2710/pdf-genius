@@ -40,7 +40,7 @@ export default function HomePage() {
     <>
       <SiteHeader />
 
-      <main>
+      <main id="main-content">
         {/* Ranged left, at reading width. A centred headline over a centred
             paragraph over two centred buttons is the shape every generated
             landing page arrives in, and it reads worse besides: the eye has to

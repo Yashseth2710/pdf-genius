@@ -198,6 +198,17 @@
     font-variant-numeric: tabular-nums;
   }
 
+  /* The toast surface is neutral for every variant (see ui/sonner), so the
+     icon is what says which kind it is. Only the icon takes the colour: it is
+     a glyph rather than text, so it answers to the 3:1 non-text threshold
+     instead of 4.5:1, and the words beside it stay at full contrast. */
+  [data-sonner-toast][data-type='success'] [data-icon] {
+    color: var(--success);
+  }
+  [data-sonner-toast][data-type='error'] [data-icon] {
+    color: var(--destructive);
+  }
+
   /* Light type on a dark ground optically blooms, so the same tracking that
      reads as even in the light theme reads as tight here. A hair of extra
      letter-spacing on body text puts it back. Headings are large enough not to

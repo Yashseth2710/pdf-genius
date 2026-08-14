@@ -22,6 +22,17 @@ export function SiteHeader() {
     // and this bar has a solid background and a hairline under it, so the blur
     // was only ever there for the look of it.
     <header className="bg-background sticky top-0 z-40 w-full border-b">
+      {/* Hidden until it has focus, which is the one moment it is useful.
+          Without it, reaching the page's actual content by keyboard means
+          tabbing past the logo, both nav links, the theme toggle and the
+          account menu — on every single page. */}
+      <a
+        href="#main-content"
+        className="bg-background focus-visible:ring-ring sr-only rounded-lg border px-4 py-2 text-sm font-medium focus-visible:not-sr-only focus-visible:absolute focus-visible:top-3 focus-visible:left-4 focus-visible:z-50 focus-visible:ring-2 focus-visible:outline-none"
+      >
+        Skip to content
+      </a>
+
       <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-4 px-6 sm:px-8">
         <Logo href={isAuthenticated ? '/dashboard' : '/'} />
 
