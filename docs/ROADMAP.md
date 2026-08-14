@@ -25,8 +25,8 @@ A scope is finished only when all of this is true (spec section 64):
 | 8  | Watermark                 | S    | 4          | Dropped |
 | 9  | Dashboard and history     | M    | 5–7        | ✅ Done |
 | 10 | AI features               | L    | 4          | Dropped |
-| 11 | Hardening                 | M    | 2–9        | Next   |
-| 12 | Deployment                | M    | 11         |        |
+| 11 | Hardening                 | M    | 2–9        | ✅ Done |
+| 12 | Deployment                | M    | 11         | Next   |
 
 ---
 
@@ -362,14 +362,44 @@ Hardening is next, and it inherits one less surface to secure.
 
 ---
 
-## 11. Hardening
+## 11. Hardening ✅
 
-- Accessibility pass: keyboard navigation, focus states, labels, contrast,
-  screen-reader behaviour
-- Security pass: the checklist in section 55, dependency audit, rate limits
-- Performance: pagination, lazy loading, memory use on large documents,
-  measured rather than guessed
-- Coverage gaps closed; end-to-end tests for every critical journey
+**Shipped — security:** response headers on every reply, including the 404s and
+429s no route produces, with `default-src 'none'` because this origin serves no
+HTML. Account lockout per *account*, which per-IP rate limits cannot see: five
+failures buys fifteen minutes, counted for addresses that have no account so
+that "never locks" does not mean "no account here", and keyed by hash so the map
+is not a list of who people tried to sign in as. A 500MB storage quota that
+results count against, enforced as a ceiling on the write rather than a check
+afterwards. A dependency audit job over the lock file and production npm
+dependencies.
+
+Two answered with a no, and written down as such: the httpOnly cookie move
+(cross-site cookies are restricted, the proxy that avoids that cannot carry
+25MB uploads on Vercel, so the token stays readable by JavaScript either way and
+the migration buys nothing) and antivirus (ClamAV wants a resident daemon and
+about a gigabyte of signatures, more than this tier has).
+
+**Shipped — accessibility:** axe-core over every screen in both themes, and a
+keyboard suite that never calls `click()`. axe found a real one: success toasts
+at 4.26:1, because only `--normal-*` had been pointed at our tokens and the
+other three variants were still on sonner's palette. Writing the keyboard tests
+found the other one: there was no skip link, so reaching content by keyboard
+meant tabbing past the whole header on every page.
+
+**Shipped — performance:** measured rather than reasoned about, and the
+measurement was the point. A 500-page organise plan peaked at **2.5GB** and
+wrote a **941MB** file, because the obvious implementation calls `insert_pdf`
+once per planned page and PyMuPDF shares objects within a call but not across
+five hundred. Rebuilt to copy pages within one document: **0.09s, no measurable
+growth, 1.9MB out**. Worst case across every tool is now a 20-document merge at
+58MB, which fits a 512MB host with room to spare. `scripts/measure.py` keeps the
+measurement repeatable, and a regression test guards the ratio.
+
+**Shipped — coverage:** 94% on the backend, with the gaps that mattered closed:
+that a crashed job reports a sentence written for a person and never the
+exception it hit, and that readiness answers 503 without naming the host or
+password in the connection it failed to open.
 
 ---
 
