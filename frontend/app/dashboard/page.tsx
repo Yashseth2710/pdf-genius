@@ -2,7 +2,7 @@
 
 import { useQueryClient } from '@tanstack/react-query'
 import { Combine, FileOutput, LayoutGrid, Minimize2, Scissors } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 
 import { DocumentList } from '@/components/documents/document-list'
 import { RecentActivity } from '@/components/history/recent-activity'

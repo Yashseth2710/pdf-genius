@@ -1,7 +1,7 @@
 'use client'
 
 import { FileText, Image as ImageIcon, Plus } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 
 import { PreviewButton } from '@/components/tools/preview-button'
 import { canPreviewInBrowser } from '@/components/tools/use-documents'

@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { Download, LayoutGrid, Loader2 } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 import { useParams } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
