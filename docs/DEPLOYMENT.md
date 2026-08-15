@@ -216,6 +216,28 @@ nowhere to go.
 **Orphaned objects.** A browser that uploads and then never calls
 `/documents/record` leaves an object with no row. Nothing collects these yet.
 
+**Orphaned rows, which are worse.** A row whose file is missing is listed in the
+interface and then fails on use — every tool answers "That document is no
+longer available", which is precisely true and completely unhelpful.
+
+This is not usually a bug. It is what happens when a development machine points
+at the production database: the upload writes a row here and puts the file on a
+laptop's disk. 116 of 120 rows were in that state on the first deploy, from
+local sessions and e2e runs.
+
+```bash
+cd backend
+STORAGE_PROVIDER=blob python scripts/purge_orphans.py            # report
+STORAGE_PROVIDER=blob python scripts/purge_orphans.py --delete   # remove
+```
+
+It prints the database host before it does anything, because it acts on
+whatever `DATABASE_URL` names.
+
+**The real fix is a separate production database.** While one Neon database
+serves both, every local upload and every test run puts another dead row in
+front of your users, and this script is a broom rather than a solution.
+
 **The bundle, and the dependency list that is not `requirements.txt`.** The
 ceiling in services mode is **225MB**, not the 500MB the Python runtime docs
 quote for a standalone function. Installing `requirements.lock.txt` produced
