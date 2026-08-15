@@ -2,13 +2,20 @@
 
 **Everything PDF. One simple workspace.**
 
-Merge, split, compress, convert, organise and understand PDF documents from a
-single place, instead of hopping between five different websites to finish one
-task.
+### → [pdf-genius.vercel.app](https://pdf-genius.vercel.app)
 
-> **Status: in development.** Accounts, uploads and the first two PDF tools —
-> merge and split — work end to end. The remaining tools and the AI features are
-> being built scope by scope; see the [roadmap](#roadmap).
+Merge, split, compress, convert and organise PDF documents from a single place,
+instead of hopping between five different websites to finish one task.
+
+> **Status: live.** All five tools, accounts, history and downloads work end to
+> end in production. Watermarking and the AI features were dropped rather than
+> built — the [roadmap](docs/ROADMAP.md) says why.
+>
+> It runs as one Vercel project holding two services, a Next.js frontend and a
+> FastAPI backend sharing an origin, with Postgres on Neon and files in Vercel
+> Blob. [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) covers what serverless cost —
+> uploads go straight from the browser to storage, because a function will not
+> take a request body over 4.5MB and the limit here is 25MB.
 
 ---
 
