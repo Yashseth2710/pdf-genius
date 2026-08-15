@@ -1,18 +1,39 @@
 # Deployment
 
-PDF Genius runs as **two Vercel projects against one repository**, plus a Neon
+Live at **https://pdf-genius.vercel.app**
+
+PDF Genius runs as **one Vercel project containing two services**, plus a Neon
 database and a Vercel Blob store.
 
-| Piece | Where | Root directory |
+| Piece | Where | Region |
 | --- | --- | --- |
-| Frontend | Vercel project `pdf-genius` | `frontend` |
-| Backend | Vercel project `pdf-genius-api` | `backend` |
-| Database | Neon (Singapore) | — |
-| Files | Vercel Blob | — |
+| `web` service | `frontend/`, Next.js | `sin1` |
+| `api` service | `backend/`, FastAPI | `sin1` |
+| Database | Neon | `ap-southeast-1` |
+| Files | Vercel Blob store `pdf-genius`, public | `sin1` |
 
-Two projects rather than one because they are two applications with different
-runtimes, build commands and environment variables. A single project would have
-to pick one.
+Services are what make one project possible: each builds independently with its
+own runtime and dependencies, and the top-level rewrites in `vercel.json` decide
+which one answers a request.
+
+```json
+"rewrites": [
+  { "source": "/api/v1/(.*)", "destination": { "service": "api" } },
+  { "source": "/(.*)",        "destination": { "service": "web" } }
+]
+```
+
+The order matters. `/api/v1/…` is matched first so that `/api/blob/upload` — a
+Next.js route handler, not an API endpoint — falls through to `web`.
+
+**Everything shares one origin, so there is no CORS.** The browser fetches
+`/api/v1/documents` from the page it already loaded. `NEXT_PUBLIC_API_URL` is
+the relative string `/api/v1`, and `CORS_ORIGINS` is set only so that a
+misconfiguration cannot silently open the API to another origin.
+
+**Everything sits in Singapore**, because the database does. The Blob store was
+first created in `iad1` and moved: a function in Washington calling a database
+in Singapore pays roughly 230ms per round trip, several times per request.
 
 ---
 
@@ -126,55 +147,45 @@ Connect it to **both** projects. The frontend needs it to mint upload tokens;
 the backend needs it to read, delete and enumerate. Vercel sets
 `BLOB_READ_WRITE_TOKEN` in each automatically.
 
-### 3. The backend project
+### 3. The project
 
-New Vercel project from this repository, **root directory `backend`**.
+One project, linked to the **repository root** — not to `frontend/` or
+`backend/`. The root is where `vercel.json` lives, and that file is what
+declares both services.
 
-No routing configuration is needed. Vercel's Python runtime detects a FastAPI
-instance named `app` at one of its known entrypoints — `app/main.py` is one of
-them — and routes every request to it. `pyproject.toml` names it explicitly
-under `[tool.vercel]` anyway, so renaming that module fails the build rather
-than silently 404ing every route.
+```bash
+vercel link --project pdf-genius
+vercel git connect
+```
 
-`vercel.json` sets a 60-second ceiling and excludes the tests, scripts and
-migrations from the bundle.
+`vercel git connect` is what makes pushes deploy themselves. Without it the
+project works but the dashboard offers "Connect Git Repository", because a CLI
+deploy uploads files without associating a repo.
 
-Environment variables:
+Environment variables, all on this one project:
 
 | Name | Value |
 | --- | --- |
-| `DATABASE_URL` | the Neon direct URL |
+| `DATABASE_URL` | the Neon **direct** URL, host without `-pooler` |
 | `JWT_SECRET` | `python -c "import secrets; print(secrets.token_urlsafe(48))"` |
-| `CORS_ORIGINS` | the frontend's real origin, no trailing slash |
 | `STORAGE_PROVIDER` | `blob` |
 | `ENVIRONMENT` | `production` |
+| `CORS_ORIGINS` | `https://pdf-genius.vercel.app` |
+| `NEXT_PUBLIC_API_URL` | `/api/v1` — relative, because it is the same origin |
+| `NEXT_PUBLIC_DIRECT_UPLOADS` | `true` |
 | `REDIS_URL` | your Redis URL, if you added one |
 | `BLOB_READ_WRITE_TOKEN` | set by Vercel when the store is linked |
 
 `ENVIRONMENT=production` also closes `/docs` and `/openapi.json`.
 
-`CORS_ORIGINS` takes a comma-separated list and never a wildcard — the browser
-sends credentials, and `*` is refused with them. Add preview origins explicitly
-if you want previews to work.
-
-### 4. The frontend project
-
-New Vercel project from the same repository, **root directory `frontend`**.
-
-| Name | Value |
-| --- | --- |
-| `NEXT_PUBLIC_API_URL` | `https://<backend project>.vercel.app/api/v1` |
-| `NEXT_PUBLIC_DIRECT_UPLOADS` | `true` |
-| `BLOB_READ_WRITE_TOKEN` | set by Vercel when the store is linked |
-
-Both `NEXT_PUBLIC_` values are compiled into the browser bundle, so changing
-either needs a redeploy, not just a restart. Neither is a secret.
+The two `NEXT_PUBLIC_` values are compiled into the browser bundle, so changing
+either needs a redeploy rather than a restart. Neither is a secret.
 `BLOB_READ_WRITE_TOKEN` **is** one, which is exactly why it has no prefix.
 
-### 5. Check it
+### 4. Check it
 
 ```bash
-curl https://<backend>.vercel.app/api/v1/health/ready
+curl https://pdf-genius.vercel.app/api/v1/health/ready
 ```
 
 Then sign up on the frontend, upload something over 5MB, and download it. That
@@ -205,7 +216,22 @@ nowhere to go.
 **Orphaned objects.** A browser that uploads and then never calls
 `/documents/record` leaves an object with no row. Nothing collects these yet.
 
-**The bundle.** 88MB of dependencies against the **500MB** uncompressed ceiling
-that applies to Python functions — the 250MB figure in most of Vercel's docs is
-the Node.js one. `excludeFiles` in `vercel.json` keeps the tests, scripts,
-migrations and virtualenv out.
+**The bundle, and the dependency list that is not `requirements.txt`.** The
+ceiling in services mode is **225MB**, not the 500MB the Python runtime docs
+quote for a standalone function. Installing `requirements.lock.txt` produced
+259MB and failed the deploy, because that file is the *development* environment
+— pytest, ruff and mypy included.
+
+So `[project].dependencies` in `backend/pyproject.toml` is the deployed set,
+pinned to the same versions the tests ran against. Four things are missing from
+it on purpose, each confirmed by grep to be unimported by `app/`:
+
+| Left out | Why |
+| --- | --- |
+| `uvicorn` | runs the app locally; the platform provides the ASGI server |
+| `alembic` | migrations run from a developer machine, never from a request |
+| `pypdf` | not imported anywhere |
+| `pdfplumber` | likewise, and it pulls in pdfminer, cryptography and pypdfium2 |
+
+Adding a runtime import means adding it there too. `requirements.txt` and the
+lock file are unchanged and still describe development and CI.

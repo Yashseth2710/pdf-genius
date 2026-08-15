@@ -12,10 +12,28 @@ import { handleUpload, type HandleUploadBody } from '@vercel/blob/client'
  * credential should stay on the server that already holds it.
  */
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+/**
+ * Where this route should call the API.
+ *
+ * `NEXT_PUBLIC_API_URL` is `/api/v1` in production, because the browser and the
+ * API share an origin and a relative path is the honest way to say so. This
+ * code does not run in a browser, though, and `fetch` on the server has no
+ * page to be relative *to* — it rejects the path outright. So a relative value
+ * is resolved against the origin this request arrived on, which is correct in
+ * production, in previews, and locally, without another environment variable
+ * that could disagree with the first.
+ */
+function apiUrl(request: Request): string {
+  const configured = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8000/api/v1'
+  if (configured.startsWith('http://') || configured.startsWith('https://')) {
+    return configured
+  }
+  return new URL(configured, new URL(request.url).origin).toString()
+}
 
 export async function POST(request: Request): Promise<Response> {
   const body = (await request.json()) as HandleUploadBody
+  const API_URL = apiUrl(request)
 
   try {
     const result = await handleUpload({

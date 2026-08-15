@@ -61,3 +61,6 @@ next-env.d.ts
 # Claude Code's pointer file. Local tooling, not part of the project.
 CLAUDE.md
 .claude/
+
+.vercel
+.env*
