@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { ArrowRight } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 
 import { buttonVariants } from '@/components/ui/button'
 import { formatExactly, formatWhen } from '@/lib/format'

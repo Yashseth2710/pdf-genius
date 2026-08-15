@@ -1,5 +1,5 @@
 import { Combine, FileOutput, LayoutGrid, Minimize2, Scissors } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 import type { Metadata } from 'next'
 
 import { BackLink } from '@/components/shared/back-link'

@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Download, FileArchive, FileImage, FileText, Loader2, Trash2 } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 

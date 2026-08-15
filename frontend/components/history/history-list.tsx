@@ -11,7 +11,7 @@ import {
   Trash2,
   XCircle,
 } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 

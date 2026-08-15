@@ -1,7 +1,7 @@
 'use client'
 
 import { Archive, CheckCircle2, Download, FileText, Loader2 } from 'lucide-react'
-import Link from 'next/link'
+import Link from '@/components/shared/link'
 import { useState } from 'react'
 import { toast } from 'sonner'
 
